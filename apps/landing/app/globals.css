@@ -1,0 +1,225 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #090806;
+  --bg-elevated: rgba(19, 15, 11, 0.78);
+  --ink: #15110c;
+  --ink-soft: #5f5548;
+  --paper: #efe7db;
+  --paper-strong: #f6efe6;
+  --line: rgba(201, 165, 106, 0.18);
+  --line-strong: rgba(201, 165, 106, 0.36);
+  --champagne: #c9a56a;
+  --champagne-bright: #e5c890;
+  --emerald: #5ac7ae;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(circle at top, rgba(201, 165, 106, 0.16), transparent 28%),
+    radial-gradient(
+      circle at 80% 20%,
+      rgba(90, 199, 174, 0.08),
+      transparent 20%
+    ),
+    linear-gradient(180deg, #090806 0%, #0d0a07 48%, #110d09 100%);
+  color: #f5efe5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 220px 220px;
+  mix-blend-mode: soft-light;
+  opacity: 0.04;
+}
+
+::selection {
+  background: rgba(201, 165, 106, 0.28);
+  color: #fff;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090806;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(229, 200, 144, 0.16);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(229, 200, 144, 0.3);
+}
+
+.font-editorial {
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+.section-shell {
+  width: min(100%, 88rem);
+  margin-inline: auto;
+}
+
+.eyebrow {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--champagne-bright);
+}
+
+.paper-surface {
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(201, 165, 106, 0.2),
+      transparent 28%
+    ),
+    linear-gradient(180deg, var(--paper-strong), var(--paper));
+  color: var(--ink);
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: clamp(3rem, 5vw, 5.5rem) clamp(3rem, 5vw, 5.5rem);
+  mask-image: radial-gradient(circle at center, black 38%, transparent 86%);
+}
+
+.edge-fade {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 10%,
+    black 90%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 10%,
+    black 90%,
+    transparent 100%
+  );
+}
+
+.subtle-link {
+  transition:
+    color 0.25s ease,
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    transform 0.25s ease;
+}
+
+.subtle-link:hover {
+  color: #fff;
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+.float-soft {
+  animation: floatSoft 9s ease-in-out infinite;
+}
+
+.orbit-spin {
+  animation: orbitSpin 24s linear infinite;
+}
+
+.orbit-spin-reverse {
+  animation: orbitSpinReverse 28s linear infinite;
+}
+
+.marquee-track {
+  width: max-content;
+  animation: marquee 32s linear infinite;
+}
+
+.code-keyword {
+  color: var(--champagne-bright);
+}
+
+.code-string {
+  color: #93dfcc;
+}
+
+.code-function {
+  color: #f0dbc1;
+}
+
+@keyframes floatSoft {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes orbitSpin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes orbitSpinReverse {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(-360deg);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@agentpay/sdk",
+  "version": "0.0.1",
+  "description": "Payment infrastructure SDK for autonomous AI agents",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@agentpay/shared": "workspace:*",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
