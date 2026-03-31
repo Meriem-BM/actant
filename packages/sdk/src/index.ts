@@ -1,67 +1,79 @@
-import type {
+/**
+ * @actant/sdk — Payment infrastructure SDK for autonomous AI agents.
+ *
+ * Core primitives:
+ * - AgentWallet: ERC-4337 execution account with programmable spend policy
+ * - AgentLogger: ERC-8004 structured execution log writer (agent_log.json)
+ * - buildManifest / hashManifest: ERC-8004 capability manifest (agent.json)
+ * - createX402Fetch: HTTP 402 auto-payment interceptor
+ *
+ * @example
+ * import { AgentWallet, AgentLogger } from '@actant/sdk'
+ *
+ * const wallet = await AgentWallet.create({
+ *   name: 'trading-bot',
+ *   spendingLimit: { daily: '50.00', perTx: '5.00' },
+ * }, client)
+ *
+ * const tx = await wallet.pay({
+ *   to: '0xRecipient',
+ *   amount: '0.04',
+ *   currency: 'USDC',
+ *   memo: 'openai-api-call',
+ * })
+ */
+
+// Core wallet
+export { AgentWallet }             from './wallet'
+export type { ActantClientConfig } from './wallet'
+
+// ERC-8004 manifest
+export {
+  buildManifest,
+  hashManifest,
+  computeAgentId,
+}                                  from './manifest'
+
+// Execution logger
+export { AgentLogger }             from './logger'
+
+// x402 machine payments
+export {
+  createX402Fetch,
+  parseX402Response,
+}                                  from './x402'
+export type { X402Options, PaymentHandler } from './x402'
+
+// ABIs (for advanced usage / direct viem calls)
+export {
+  AGENT_WALLET_ABI,
+  AGENT_REGISTRY_ABI,
+  AGENT_WALLET_FACTORY_ABI,
+  ERC20_ABI,
+}                                  from './abis'
+
+// Re-export shared types
+export type {
   WalletConfig,
   CreateWalletResponse,
   PaymentRequest,
   PaymentResponse,
-} from '@agentpay/shared'
+  AgentManifest,
+  AgentCapability,
+  AgentSafetyPolicy,
+  AgentLogEntry,
+  AgentLog,
+  AgentRecord,
+  AgentStatus,
+  X402PaymentRequired,
+  Transaction,
+  Agent,
+  UserOperation,
+}                                  from '@agentpay/shared'
 
-export interface AgentWalletOptions {
-  apiKey?: string
-  name?: string
-  chainId?: number
-  spendingLimit?: {
-    daily?: string
-    perTx?: string
-  }
-}
-
-export class AgentWallet {
-  private apiKey: string
-  private walletAddress: string | null = null
-  private agentId: string | null = null
-
-  private constructor(apiKey: string) {
-    this.apiKey = apiKey
-  }
-
-  /**
-   * Create a new agent wallet on Base.
-   * Deploys an ERC-4337 smart contract wallet and registers it with AgentPay.
-   */
-  static async create(config: WalletConfig): Promise<AgentWallet> {
-    // TODO: call AgentPay API to deploy wallet
-    throw new Error('AgentWallet.create() — not yet implemented. SDK is in development.')
-  }
-
-  /**
-   * Load an existing agent wallet by API key.
-   */
-  static fromKey(apiKey: string): AgentWallet {
-    return new AgentWallet(apiKey)
-  }
-
-  /**
-   * Send a USDC payment from this agent wallet.
-   */
-  async pay(request: PaymentRequest): Promise<PaymentResponse> {
-    // TODO: submit UserOperation via bundler, settle on Base
-    throw new Error('AgentWallet.pay() — not yet implemented. SDK is in development.')
-  }
-
-  /**
-   * Get the current USDC balance of this agent wallet.
-   */
-  async getBalance(): Promise<string> {
-    // TODO: read USDC balance from Base
-    throw new Error('AgentWallet.getBalance() — not yet implemented. SDK is in development.')
-  }
-
-  /**
-   * Get the wallet's on-chain address.
-   */
-  getAddress(): string | null {
-    return this.walletAddress
-  }
-}
-
-export type { WalletConfig, PaymentRequest, PaymentResponse, CreateWalletResponse }
+export {
+  USDC_ADDRESSES,
+  CONTRACT_ADDRESSES,
+  SUPPORTED_CHAINS,
+  AgentStatus as AgentStatusEnum,
+}                                  from '@agentpay/shared'

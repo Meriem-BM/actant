@@ -1,7 +1,7 @@
 {
-  "name": "@agentpay/sdk",
-  "version": "0.0.1",
-  "description": "Payment infrastructure SDK for autonomous AI agents",
+  "name": "@actant/sdk",
+  "version": "0.1.0",
+  "description": "ERC-4337 + ERC-8004 payment infrastructure SDK for autonomous AI agents",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
