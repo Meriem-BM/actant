@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg:               #0b0708;
+  --bg-elevated:      rgba(20, 11, 13, 0.9);
+  --bg-card:          rgba(30, 16, 20, 0.76);
+  --ink:              #160c0f;
+  --paper:            #f8eeec;
+  --line:             rgba(255, 124, 111, 0.18);
+  --line-strong:      rgba(255, 124, 111, 0.36);
+  --accent:           #ff7c6f;
+  --accent-bright:    #ff9f95;
+  --success:          #7ad8b8;
+  --success-dim:      rgba(122, 216, 184, 0.12);
+  --danger:           #ff7f7f;
+  --danger-dim:       rgba(255, 127, 127, 0.12);
+  --amber:            #ffb16a;
+  --amber-dim:        rgba(255, 177, 106, 0.12);
+  --info:             #9db3ff;
+  --info-dim:         rgba(157, 179, 255, 0.12);
+  --text-main:        #f8eeec;
+  --text-soft:        #d8c0be;
+  --text-faint:       #9f8582;
+}
+
+* { box-sizing: border-box; padding: 0; margin: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background:
+    radial-gradient(circle at 10% -10%, rgba(255, 124, 111, 0.2), transparent 38%),
+    radial-gradient(circle at 88% 8%, rgba(255, 90, 122, 0.12), transparent 28%),
+    linear-gradient(180deg, #080506 0%, #0d0708 48%, #13080b 100%);
+  color: var(--text-main);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+html::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 220px 220px;
+  mix-blend-mode: soft-light;
+  opacity: 0.03;
+}
+
+::selection { background: rgba(255, 124, 111, 0.28); color: #fff; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #0b0708; }
+::-webkit-scrollbar-thumb { background: rgba(255, 159, 149, 0.22); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 159, 149, 0.34); }
+
+/* Utilities */
+
+.eyebrow {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+}
+
+.card {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+    var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 20px 45px rgba(4, 2, 3, 0.38);
+}
+
+.card-sm {
+  border-radius: 1rem;
+}
+
+.status-active {
+  color: var(--success);
+  background: var(--success-dim);
+  border: 1px solid rgba(122, 216, 184, 0.24);
+}
+
+.status-paused {
+  color: var(--amber);
+  background: var(--amber-dim);
+  border: 1px solid rgba(255, 177, 106, 0.24);
+}
+
+.status-revoked {
+  color: var(--danger);
+  background: var(--danger-dim);
+  border: 1px solid rgba(255, 127, 127, 0.24);
+}
+
+.spend-bar-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.spend-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spend-bar-fill.danger {
+  background: linear-gradient(90deg, var(--amber), var(--danger));
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+.live-dot {
+  animation: livePulse 2.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.1) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s infinite;
+  border-radius: 0.5rem;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up {
+  animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
