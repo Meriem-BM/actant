@@ -120,7 +120,7 @@ contract AgentRegistryTest is Test {
         registry.revokeAgent(AGENT_ID);
 
         vm.prank(operator);
-        vm.expectRevert(AgentRegistry.AgentRevoked.selector);
+        vm.expectRevert(AgentRegistry.AgentIsRevoked.selector);
         registry.pauseAgent(AGENT_ID);
     }
 

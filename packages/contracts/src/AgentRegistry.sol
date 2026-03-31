@@ -25,7 +25,7 @@ contract AgentRegistry is IAgentRegistry {
     error NotOwner();
     error NotOperator();
     error AgentNotFound();
-    error AgentRevoked();
+    error AgentIsRevoked();
     error AgentIdTaken();
     error ZeroWallet();
     error ZeroOperator();
@@ -71,7 +71,7 @@ contract AgentRegistry is IAgentRegistry {
     }
 
     modifier agentNotRevoked(bytes32 agentId) {
-        if (_agents[agentId].status == Status.Revoked) revert AgentRevoked();
+        if (_agents[agentId].status == Status.Revoked) revert AgentIsRevoked();
         _;
     }
 
@@ -229,7 +229,8 @@ contract AgentRegistry is IAgentRegistry {
     }
 
     function isActive(bytes32 agentId) external view override returns (bool) {
-        return _agents[agentId].status == Status.Active;
+        AgentRecord storage agent = _agents[agentId];
+        return agent.registeredAt != 0 && agent.status == Status.Active;
     }
 
     function getWallet(bytes32 agentId)
