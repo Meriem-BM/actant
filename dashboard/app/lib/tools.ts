@@ -93,9 +93,9 @@ export interface MarketSignal {
 export function analyzeMarketSignal(price: TokenPrice): MarketSignal {
   const change = price.usd_24h_change
 
-  if (change > 5)  return { symbol: price.symbol, price: price.usd, signal: 'bullish', confidence: Math.min(0.9, 0.5 + change / 40), reason: `${price.symbol} up ${change.toFixed(2)}% in 24h — strong momentum`, suggestedAction: `Monitor for entry at $${price.usd.toFixed(2)}` }
-  if (change > 2)  return { symbol: price.symbol, price: price.usd, signal: 'bullish', confidence: 0.6, reason: `${price.symbol} up ${change.toFixed(2)}% in 24h — mild bullish` }
-  if (change < -5) return { symbol: price.symbol, price: price.usd, signal: 'bearish', confidence: Math.min(0.9, 0.5 + Math.abs(change) / 40), reason: `${price.symbol} down ${Math.abs(change).toFixed(2)}% in 24h — significant drawdown`, suggestedAction: `Check exposure at $${price.usd.toFixed(2)}` }
-  if (change < -2) return { symbol: price.symbol, price: price.usd, signal: 'bearish', confidence: 0.6, reason: `${price.symbol} down ${Math.abs(change).toFixed(2)}% in 24h — mild bearish` }
+  if (change > 5)  return { symbol: price.symbol, price: price.usd, signal: 'bullish', confidence: Math.min(0.9, 0.5 + change / 40), reason: `${price.symbol} up ${change.toFixed(2)}% in 24h, strong momentum`, suggestedAction: `Monitor for entry at $${price.usd.toFixed(2)}` }
+  if (change > 2)  return { symbol: price.symbol, price: price.usd, signal: 'bullish', confidence: 0.6, reason: `${price.symbol} up ${change.toFixed(2)}% in 24h, mild bullish` }
+  if (change < -5) return { symbol: price.symbol, price: price.usd, signal: 'bearish', confidence: Math.min(0.9, 0.5 + Math.abs(change) / 40), reason: `${price.symbol} down ${Math.abs(change).toFixed(2)}% in 24h, significant drawdown`, suggestedAction: `Check exposure at $${price.usd.toFixed(2)}` }
+  if (change < -2) return { symbol: price.symbol, price: price.usd, signal: 'bearish', confidence: 0.6, reason: `${price.symbol} down ${Math.abs(change).toFixed(2)}% in 24h, mild bearish` }
   return { symbol: price.symbol, price: price.usd, signal: 'neutral', confidence: 0.5, reason: `${price.symbol} flat (${change.toFixed(2)}% 24h)` }
 }

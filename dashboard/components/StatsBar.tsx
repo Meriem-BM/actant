@@ -9,38 +9,58 @@ interface StatsBarProps {
 }
 
 export default function StatsBar({ agents, loading }: StatsBarProps) {
-  const active    = agents.filter(a => a.status === 0).length
-  const paused    = agents.filter(a => a.status === 1).length
-  const totalSettled = agents.reduce((s, a) => s + parseFloat(a.totalSettled || '0'), 0)
-  const totalBalance = agents.reduce((s, a) => s + parseFloat(a.balance || '0'), 0)
-  const avgRep    = agents.length
-    ? Math.round(agents.reduce((s, a) => s + a.reputationScore, 0) / agents.length)
+  const metrics = agents.reduce(
+    (accumulator, agent) => {
+      if (agent.status === 0) {
+        accumulator.active += 1
+      } else if (agent.status === 1) {
+        accumulator.paused += 1
+      }
+
+      accumulator.totalSettled += parseFloat(agent.totalSettled || '0')
+      accumulator.totalBalance += parseFloat(agent.balance || '0')
+      accumulator.totalReputation += agent.reputationScore
+      accumulator.totalExecutions += agent.executionCount
+
+      return accumulator
+    },
+    {
+      active: 0,
+      paused: 0,
+      totalSettled: 0,
+      totalBalance: 0,
+      totalReputation: 0,
+      totalExecutions: 0,
+    },
+  )
+
+  const avgRep = agents.length
+    ? Math.round(metrics.totalReputation / agents.length)
     : 0
-  const totalExec = agents.reduce((s, a) => s + a.executionCount, 0)
 
   const stats = [
     {
       label: 'Execution Accounts',
       value: loading ? null : String(agents.length),
-      sub:   `${active} active${paused ? ` · ${paused} paused` : ''}`,
+      sub:   `${metrics.active} active${metrics.paused ? ` · ${metrics.paused} paused` : ''}`,
       accent: false,
     },
     {
       label: 'Total Settled',
-      value: loading ? null : `$${totalSettled.toFixed(2)}`,
+      value: loading ? null : `$${metrics.totalSettled.toFixed(2)}`,
       sub:   'USDC on Base',
       accent: true,
     },
     {
       label: 'Available Balance',
-      value: loading ? null : `$${totalBalance.toFixed(2)}`,
+      value: loading ? null : `$${metrics.totalBalance.toFixed(2)}`,
       sub:   'across all wallets',
       accent: false,
     },
     {
       label: 'Avg Reputation',
       value: loading ? null : `${avgRep}%`,
-      sub:   `${totalExec} executions · ERC-8004`,
+      sub:   `${metrics.totalExecutions} executions · ERC-8004`,
       accent: false,
     },
   ]

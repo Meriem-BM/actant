@@ -33,6 +33,16 @@ export interface ExecutionEvent {
 }
 
 const USDC_DEC = 6
+type ExecutionLog = {
+  args: {
+    agentId: `0x${string}`
+    logHash: `0x${string}`
+    amountSettled: bigint
+    success: boolean
+  }
+  blockNumber: bigint | null
+  transactionHash: `0x${string}` | null
+}
 
 function fmt(raw: bigint) {
   return formatUnits(raw, USDC_DEC)
@@ -149,14 +159,16 @@ export async function fetchRecentExecutions(
     toBlock:   latest,
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return logs.reverse().slice(0, 50).map((log: any) => ({
-    agentId:       log.args.agentId as `0x${string}`,
-    logHash:       log.args.logHash as `0x${string}`,
-    amountSettled: fmt(log.args.amountSettled as bigint),
-    success:       log.args.success as boolean,
-    blockNumber:   log.blockNumber!,
-    txHash:        log.transactionHash!,
-  }))
+  return (logs as ExecutionLog[])
+    .reverse()
+    .slice(0, 50)
+    .filter((log) => Boolean(log.blockNumber && log.transactionHash))
+    .map((log) => ({
+      agentId: log.args.agentId,
+      logHash: log.args.logHash,
+      amountSettled: fmt(log.args.amountSettled),
+      success: log.args.success,
+      blockNumber: log.blockNumber as bigint,
+      txHash: log.transactionHash as `0x${string}`,
+    }))
 }
-

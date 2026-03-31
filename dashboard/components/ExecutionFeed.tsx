@@ -2,16 +2,13 @@
 
 import { motion } from 'framer-motion'
 import { txUrl } from '@/app/lib/chain'
+import { shortAddress } from '@/app/lib/format'
 import type { ExecutionEvent, AgentData } from '@/app/lib/contracts'
 
 interface ExecutionFeedProps {
   events:  ExecutionEvent[]
   agents:  AgentData[]
   loading: boolean
-}
-
-function shortAddr(hex: string) {
-  return `${hex.slice(0, 6)}…${hex.slice(-4)}`
 }
 
 function timeAgo(blockNumber: bigint): string {
@@ -87,7 +84,7 @@ export default function ExecutionFeed({ events, agents, loading }: ExecutionFeed
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate font-mono text-[13px] text-white/50">
-                        {agent ? shortAddr(agent.wallet) : shortAddr(event.agentId)}
+                        {agent ? shortAddress(agent.wallet) : shortAddress(event.agentId)}
                       </p>
                       <span className="text-white/15">→</span>
                       <span className="font-mono text-[13px] text-white/30">settled</span>
@@ -103,7 +100,7 @@ export default function ExecutionFeed({ events, agents, loading }: ExecutionFeed
                           rel="noopener noreferrer"
                           className="font-mono text-[12px] text-white/20 opacity-0 transition-opacity hover:text-[#ff9f95] group-hover:opacity-100"
                         >
-                          {shortAddr(event.txHash)} ↗
+                          {shortAddress(event.txHash)} ↗
                         </a>
                       )}
                     </div>
