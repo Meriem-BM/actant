@@ -1,257 +1,336 @@
 import {
   createPublicClient,
   createWalletClient,
-  http,
-  parseUnits,
+  formatEther,
   formatUnits,
+  http,
+  isAddress,
+  isHash,
   keccak256,
+  parseEther,
+  parseUnits,
   toHex,
-  type PublicClient,
   type Account,
   type Chain,
 } from 'viem'
-import { baseSepolia, base } from 'viem/chains'
+import { base, baseSepolia } from 'viem/chains'
 import type {
-  WalletConfig,
+  AgentManifest,
+  AgentRecord,
   CreateWalletResponse,
   PaymentRequest,
   PaymentResponse,
-  AgentManifest,
+  UserOperation,
+  WalletConfig,
 } from '@agentpay/shared'
-import { USDC_ADDRESSES, CONTRACT_ADDRESSES, SUPPORTED_CHAINS } from '@agentpay/shared'
+import { SUPPORTED_CHAINS, USDC_ADDRESSES } from '@agentpay/shared'
 import {
+  AGENT_REGISTRY_ABI,
   AGENT_WALLET_ABI,
   AGENT_WALLET_FACTORY_ABI,
-  AGENT_REGISTRY_ABI,
   ERC20_ABI,
 } from './abis'
+import {
+  encodePayCallData,
+  ENTRY_POINT,
+  ENTRY_POINT_ABI,
+  estimateUserOpGas,
+  getUserOpHash,
+  sendUserOperation,
+  signUserOp,
+  waitForUserOpReceipt,
+} from './bundler'
 import { AgentLogger } from './logger'
-import { buildManifest, hashManifest, computeAgentId } from './manifest'
+import { buildManifest, computeAgentId, hashManifest } from './manifest'
 import { createX402Fetch } from './x402'
 
+const DEFAULT_CHAIN_ID = SUPPORTED_CHAINS.BASE_SEPOLIA
+const DEFAULT_DAILY_LIMIT = '50.00'
+const DEFAULT_PER_TX_LIMIT = '5.00'
+const DEFAULT_MAX_FEE_PER_GAS = 100_000_000n
+const DEFAULT_MAX_PRIORITY_FEE_PER_GAS = 1_000_000n
+const GAS_BUFFER_MULTIPLIER = 120n
+const GAS_BUFFER_DIVISOR = 100n
 const USDC_DECIMALS = 6
+const ZERO_LOG_HASH = `0x${'0'.repeat(64)}` as `0x${string}`
+const PAYMENT_SENT_TOPIC = keccak256(
+  toHex('PaymentSent(address,uint256,string,bytes32)'),
+)
 
-// keccak256("PaymentSent(address,uint256,string,bytes32)")
-// Pre-computed so _extractLogHash doesn't recompute on every call.
-const PAYMENT_SENT_TOPIC = keccak256(toHex('PaymentSent(address,uint256,string,bytes32)'))
+type Hex = `0x${string}`
+type Address = `0x${string}`
+type Bytes32 = `0x${string}`
 
-function toUSDC(human: string): bigint {
-  return parseUnits(human, USDC_DECIMALS)
+type WriteContractParams = {
+  address: Address
+  abi: readonly unknown[]
+  functionName: string
+  args?: readonly unknown[]
+  chain?: Chain
+  value?: bigint
 }
 
-function fromUSDC(raw: bigint): string {
-  return formatUnits(raw, USDC_DECIMALS)
+type SendTransactionParams = {
+  to: Address
+  value: bigint
+  chain?: Chain
+}
+
+type SignMessageParams = {
+  account: Address
+  message: { raw: Hex }
+}
+
+export interface WalletClientLike {
+  writeContract(params: WriteContractParams): Promise<Address>
+  sendTransaction(params: SendTransactionParams): Promise<Address>
+  signMessage?: (params: SignMessageParams) => Promise<Address>
+}
+
+export interface ActantClientConfig {
+  account: Account
+  chainId?: number
+  rpcUrl?: string
+  factory: Address
+  registry: Address
+  bundlerUrl?: string
+  externalWalletClient?: WalletClientLike
+}
+
+type WalletInit = {
+  walletAddress: Address
+  agentId: Bytes32
+  manifest: AgentManifest
+  publicClient: ReturnType<typeof createPublicClient>
+  walletClient: WalletClientLike
+  usdcAddress: Address
+  registryAddr: Address
+  chain: Chain
+  account: Account
+  chainId: number
+  bundlerUrl?: string
+}
+
+type ClientContext = {
+  chainId: number
+  chain: Chain
+  publicClient: ReturnType<typeof createPublicClient>
+  walletClient: WalletClientLike
+  usdcAddress: Address
+}
+
+function toUSDC(amount: string): bigint {
+  return parseUnits(amount, USDC_DECIMALS)
+}
+
+function fromUSDC(rawAmount: bigint): string {
+  return formatUnits(rawAmount, USDC_DECIMALS)
 }
 
 function getChain(chainId: number): Chain {
   return chainId === SUPPORTED_CHAINS.BASE_MAINNET ? base : baseSepolia
 }
 
-export interface ActantClientConfig {
-  /** Signer account (viem Account or private key hex string) */
-  account:    Account
-  /** Chain ID — defaults to Base Sepolia (84532) */
-  chainId?:   number
-  /** Custom RPC URL — defaults to public Base RPC */
-  rpcUrl?:    string
-  /** Deployed AgentWalletFactory address */
-  factory:    `0x${string}`
-  /** Deployed AgentRegistry address */
-  registry:   `0x${string}`
+function resolveRpcUrl(chain: Chain, customRpcUrl?: string): string {
+  return customRpcUrl ?? chain.rpcUrls.default.http[0]
 }
 
-/**
- * AgentWallet — the core SDK class for managing Actant execution accounts.
- *
- * Each AgentWallet instance represents a single deployed ERC-4337 smart contract
- * account linked to an ERC-8004 identity in AgentRegistry.
- *
- * @example
- * // Create a new agent wallet
- * const wallet = await AgentWallet.create({
- *   name: 'trading-bot',
- *   spendingLimit: { daily: '50.00', perTx: '5.00' },
- * }, client)
- *
- * // Pay from the agent wallet
- * const tx = await wallet.pay({
- *   to: '0xRecipient',
- *   amount: '0.04',
- *   currency: 'USDC',
- *   memo: 'openai-api-call',
- * })
- */
+function assertAddress(value: string, field: string): asserts value is Address {
+  if (!isAddress(value)) {
+    throw new Error(`Invalid ${field} address: ${value}`)
+  }
+}
+
+function assertBytes32(value: string, field: string): asserts value is Bytes32 {
+  if (!isHash(value)) {
+    throw new Error(`Invalid ${field} bytes32 hash: ${value}`)
+  }
+}
+
+function createClientContext(config: ActantClientConfig): ClientContext {
+  const chainId = config.chainId ?? DEFAULT_CHAIN_ID
+  const chain = getChain(chainId)
+  const rpcUrl = resolveRpcUrl(chain, config.rpcUrl)
+
+  const usdcAddress = USDC_ADDRESSES[chainId]
+  if (!usdcAddress) {
+    throw new Error(`Unsupported chainId: ${chainId}`)
+  }
+
+  const publicClient = createPublicClient({
+    chain,
+    transport: http(rpcUrl),
+  })
+
+  const walletClient =
+    config.externalWalletClient ??
+    (createWalletClient({
+      chain,
+      transport: http(rpcUrl),
+      account: config.account,
+    }) as unknown as WalletClientLike)
+
+  if (
+    typeof walletClient.writeContract !== 'function' ||
+    typeof walletClient.sendTransaction !== 'function'
+  ) {
+    throw new Error(
+      'Invalid wallet client: writeContract and sendTransaction are required',
+    )
+  }
+
+  return {
+    chainId,
+    chain,
+    publicClient,
+    walletClient,
+    usdcAddress,
+  }
+}
+
 export class AgentWallet {
-  readonly walletAddress: `0x${string}`
-  readonly agentId:       `0x${string}`
-  readonly manifest:      AgentManifest
-  readonly logger:        AgentLogger
+  readonly walletAddress: Address
+  readonly agentId: Bytes32
+  readonly manifest: AgentManifest
+  readonly logger: AgentLogger
 
-  private publicClient:  PublicClient
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private walletClient:  any
-  private usdcAddress:   `0x${string}`
-  private registryAddr:  `0x${string}`
-  private chain:         Chain
+  private publicClient: ReturnType<typeof createPublicClient>
+  private walletClient: WalletClientLike
+  private usdcAddress: Address
+  private registryAddr: Address
+  private chain: Chain
+  private account: Account
+  private chainId: number
+  private bundlerUrl?: string
 
-  private constructor(params: {
-    walletAddress: `0x${string}`
-    agentId:       `0x${string}`
-    manifest:      AgentManifest
-    publicClient:  PublicClient
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    walletClient:  any
-    usdcAddress:   `0x${string}`
-    registryAddr:  `0x${string}`
-    chain:         Chain
-  }) {
-    this.walletAddress  = params.walletAddress
-    this.agentId        = params.agentId
-    this.manifest       = params.manifest
-    this.publicClient   = params.publicClient
-    this.walletClient   = params.walletClient
-    this.usdcAddress    = params.usdcAddress
-    this.registryAddr   = params.registryAddr
-    this.chain          = params.chain
+  private constructor(params: WalletInit) {
+    this.walletAddress = params.walletAddress
+    this.agentId = params.agentId
+    this.manifest = params.manifest
+    this.publicClient = params.publicClient
+    this.walletClient = params.walletClient
+    this.usdcAddress = params.usdcAddress
+    this.registryAddr = params.registryAddr
+    this.chain = params.chain
+    this.account = params.account
+    this.chainId = params.chainId
+    this.bundlerUrl = params.bundlerUrl
+
     this.logger = new AgentLogger({
-      agentId:   params.agentId,
+      agentId: params.agentId,
       agentName: params.manifest.name,
     })
   }
 
-  // ─── Static: create ─────────────────────────────────────────────────────────
-
-  /**
-   * Deploy a new agent wallet and register it in AgentRegistry (ERC-8004).
-   * This is a single transaction that atomically:
-   * 1. Deploys the ERC-4337 execution account
-   * 2. Registers the agent identity in AgentRegistry
-   *
-   * If `config.allowedRecipients` is set, each address is added to the
-   * on-chain allowlist via follow-up transactions after deployment.
-   */
   static async create(
     config: WalletConfig,
     client: ActantClientConfig,
   ): Promise<{ wallet: AgentWallet; response: CreateWalletResponse }> {
-    const chainId  = client.chainId ?? SUPPORTED_CHAINS.BASE_SEPOLIA
-    const chain    = getChain(chainId)
-    const usdcAddr = USDC_ADDRESSES[chainId]
+    assertAddress(client.factory, 'factory')
+    assertAddress(client.registry, 'registry')
 
-    const publicClient = createPublicClient({
-      chain,
-      transport: http(client.rpcUrl),
-    })
-    const walletClient = createWalletClient({
-      chain,
-      transport: http(client.rpcUrl),
-      account:   client.account,
-    })
+    const { chainId, chain, publicClient, walletClient, usdcAddress } =
+      createClientContext(client)
 
     const operator = client.account.address
-    const agentId  = computeAgentId(config.name, operator) as `0x${string}`
+    const agentId = computeAgentId(config.name, operator) as Bytes32
 
-    // Pre-compute the deterministic wallet address so the manifest hash
-    // committed on-chain matches the manifest returned to the caller.
-    // (Computing the hash after mutating manifest.wallet would break ERC-8004 verification.)
-    const predictedWallet = await publicClient.readContract({
-      address:      client.factory,
-      abi:          AGENT_WALLET_FACTORY_ABI,
+    const predictedWallet = (await publicClient.readContract({
+      address: client.factory,
+      abi: AGENT_WALLET_FACTORY_ABI,
       functionName: 'getWalletAddress',
-      args:         [agentId, operator],
-    }) as `0x${string}`
+      args: [agentId, operator],
+    })) as Address
+
+    const dailyLimit = config.spendingLimit?.daily ?? DEFAULT_DAILY_LIMIT
+    const perTxLimit = config.spendingLimit?.perTx ?? DEFAULT_PER_TX_LIMIT
 
     const manifest = buildManifest({
       agentId,
-      name:        config.name,
+      name: config.name,
       description: `Autonomous agent: ${config.name}`,
       operator,
-      wallet:      predictedWallet,
+      wallet: predictedWallet,
       chainId,
       config,
     })
-    const manifestHash = hashManifest(manifest)
 
-    const dailyLimitRaw = toUSDC(config.spendingLimit?.daily ?? '50.00')
-    const perTxLimitRaw = toUSDC(config.spendingLimit?.perTx ?? '5.00')
-
-    // Deploy + register atomically via factory
     const txHash = await walletClient.writeContract({
-      address:      client.factory,
-      abi:          AGENT_WALLET_FACTORY_ABI,
+      address: client.factory,
+      abi: AGENT_WALLET_FACTORY_ABI,
       functionName: 'createWallet',
-      args:         [agentId, operator, dailyLimitRaw, perTxLimitRaw, manifestHash],
+      args: [
+        agentId,
+        operator,
+        toUSDC(dailyLimit),
+        toUSDC(perTxLimit),
+        hashManifest(manifest),
+      ],
       chain,
     })
 
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
-    if (receipt.status !== 'success') {
-      throw new Error(`AgentWallet.create: transaction reverted — ${txHash}`)
-    }
+    await AgentWallet.waitForSuccessReceipt(publicClient, txHash, 'AgentWallet.create')
 
-    const walletAddr = await publicClient.readContract({
-      address:      client.factory,
-      abi:          AGENT_WALLET_FACTORY_ABI,
+    const walletAddress = (await publicClient.readContract({
+      address: client.factory,
+      abi: AGENT_WALLET_FACTORY_ABI,
       functionName: 'wallets',
-      args:         [agentId],
-    }) as `0x${string}`
+      args: [agentId],
+    })) as Address
 
-    // Apply allowlist if configured — separate transactions after deployment
-    if (config.allowedRecipients && config.allowedRecipients.length > 0) {
-      for (const recipient of config.allowedRecipients) {
-        const allowTx = await walletClient.writeContract({
-          address:      walletAddr,
-          abi:          AGENT_WALLET_ABI,
-          functionName: 'allowRecipient',
-          args:         [recipient],
-          chain,
-        })
-        await publicClient.waitForTransactionReceipt({ hash: allowTx })
-      }
+    const allowedRecipients = config.allowedRecipients ?? []
+    for (const recipient of allowedRecipients) {
+      assertAddress(recipient, 'allowed recipient')
+      const allowTx = await walletClient.writeContract({
+        address: walletAddress,
+        abi: AGENT_WALLET_ABI,
+        functionName: 'allowRecipient',
+        args: [recipient],
+        chain,
+      })
+      await AgentWallet.waitForSuccessReceipt(
+        publicClient,
+        allowTx,
+        'AgentWallet.create.allowRecipient',
+      )
     }
+
+    const wallet = new AgentWallet({
+      walletAddress,
+      agentId,
+      manifest,
+      publicClient,
+      walletClient,
+      usdcAddress,
+      registryAddr: client.registry,
+      chain,
+      account: client.account,
+      chainId,
+      bundlerUrl: client.bundlerUrl,
+    })
 
     const response: CreateWalletResponse = {
-      walletAddress: walletAddr,
+      walletAddress,
       agentId,
       txHash,
       manifest,
     }
 
-    const wallet = new AgentWallet({
-      walletAddress: walletAddr,
-      agentId,
-      manifest,
-      publicClient,
-      walletClient,
-      usdcAddress:  usdcAddr,
-      registryAddr: client.registry,
-      chain,
-    })
-
     return { wallet, response }
   }
 
-  /**
-   * Load an existing agent wallet by address (no deployment).
-   */
   static fromAddress(
-    walletAddress: `0x${string}`,
-    agentId:       `0x${string}`,
-    manifest:      AgentManifest,
-    client:        ActantClientConfig,
+    walletAddress: Address,
+    agentId: Bytes32,
+    manifest: AgentManifest,
+    client: ActantClientConfig,
   ): AgentWallet {
-    const chainId = client.chainId ?? SUPPORTED_CHAINS.BASE_SEPOLIA
-    const chain   = getChain(chainId)
+    assertAddress(walletAddress, 'walletAddress')
+    assertAddress(agentId, 'agentId')
+    assertAddress(client.registry, 'registry')
 
-    const publicClient = createPublicClient({
-      chain,
-      transport: http(client.rpcUrl),
-    })
-    const walletClient = createWalletClient({
-      chain,
-      transport: http(client.rpcUrl),
-      account:   client.account,
-    })
+    const { chainId, chain, publicClient, walletClient, usdcAddress } =
+      createClientContext(client)
 
     return new AgentWallet({
       walletAddress,
@@ -259,166 +338,372 @@ export class AgentWallet {
       manifest,
       publicClient,
       walletClient,
-      usdcAddress:  USDC_ADDRESSES[chainId],
+      usdcAddress,
       registryAddr: client.registry,
       chain,
+      account: client.account,
+      chainId,
+      bundlerUrl: client.bundlerUrl,
     })
   }
 
-  // ─── pay ─────────────────────────────────────────────────────────────────────
-
-  /**
-   * Send a USDC payment from this agent wallet.
-   *
-   * Throws if the transaction is mined but reverted (e.g. limits changed,
-   * agent paused, or balance insufficient after broadcast).
-   */
   async pay(request: PaymentRequest): Promise<PaymentResponse> {
-    const to     = request.to as `0x${string}`
-    const amount = toUSDC(request.amount)
-    const memo   = request.memo ?? ''
+    if (request.currency !== 'USDC') {
+      throw new Error(`Unsupported currency: ${request.currency}`)
+    }
 
-    const txHash = await this.walletClient.writeContract({
-      address:      this.walletAddress,
-      abi:          AGENT_WALLET_ABI,
-      functionName: 'pay',
-      args:         [to, amount, memo],
-      chain:        this.chain,
-    })
+    if (!isAddress(request.to)) {
+      throw new Error(`Invalid payment recipient address: ${request.to}`)
+    }
+
+    const to = request.to as Address
+    const amount = toUSDC(request.amount)
+    const memo = request.memo ?? ''
+
+    const txHash = this.bundlerUrl
+      ? await this.sendViaUserOperation(encodePayCallData(to, amount, memo))
+      : await this.walletClient.writeContract({
+          address: this.walletAddress,
+          abi: AGENT_WALLET_ABI,
+          functionName: 'pay',
+          args: [to, amount, memo],
+          chain: this.chain,
+        })
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash })
-
     if (receipt.status !== 'success') {
       throw new Error(`AgentWallet.pay: transaction reverted — ${txHash}`)
     }
 
+    const logHash = this.extractPaymentLogHash(receipt.logs) ?? ZERO_LOG_HASH
     const timestamp = new Date()
 
-    // Extract the logHash from the PaymentSent event.
-    // The event is identified by its topic signature to avoid reading the wrong
-    // log (USDC emits a Transfer event before PaymentSent in the same tx).
-    const logHash = this._extractLogHash(receipt.logs) ?? `0x${'0'.repeat(64)}` as `0x${string}`
-
-    // Log locally using the same logHash that was committed on-chain,
-    // so off-chain entries can be verified against AgentRegistry.
     this.logger.logPayment({
       to,
-      amount:      request.amount,
-      currency:    'USDC',
+      amount: request.amount,
+      currency: 'USDC',
       memo,
       txHash,
       blockNumber: Number(receipt.blockNumber),
-      success:     true,
+      success: true,
       logHash,
     })
 
     return {
-      hash:      txHash,
-      status:    'confirmed' as const,
-      amount:    request.amount,
+      hash: txHash,
+      status: 'confirmed',
+      amount: request.amount,
       to,
       timestamp,
       logHash,
     }
   }
 
-  // ─── getBalance ──────────────────────────────────────────────────────────────
-
-  /** Get the current USDC balance of this agent wallet (human-readable). */
-  async getBalance(): Promise<string> {
-    const raw = await this.publicClient.readContract({
-      address:      this.usdcAddress,
-      abi:          ERC20_ABI,
-      functionName: 'balanceOf',
-      args:         [this.walletAddress],
-    }) as bigint
-
-    return fromUSDC(raw)
-  }
-
-  /** Get how much USDC has been spent today (human-readable). */
-  async getDailySpent(): Promise<string> {
-    const raw = await this.publicClient.readContract({
-      address:      this.walletAddress,
-      abi:          AGENT_WALLET_ABI,
-      functionName: 'dailySpent',
-    }) as bigint
-
-    return fromUSDC(raw)
-  }
-
-  // ─── Registry reads ──────────────────────────────────────────────────────────
-
-  /** Check if this agent is active in the registry. */
-  async isActive(): Promise<boolean> {
-    return await this.publicClient.readContract({
-      address:      this.registryAddr,
-      abi:          AGENT_REGISTRY_ABI,
-      functionName: 'isActive',
-      args:         [this.agentId],
-    }) as boolean
-  }
-
-  /** Get the on-chain ERC-8004 record for this agent. */
-  async getOnChainRecord() {
-    return await this.publicClient.readContract({
-      address:      this.registryAddr,
-      abi:          AGENT_REGISTRY_ABI,
-      functionName: 'getAgent',
-      args:         [this.agentId],
+  async depositGas(amountEth: string): Promise<Address> {
+    const txHash = await this.walletClient.sendTransaction({
+      to: this.walletAddress,
+      value: parseEther(amountEth),
+      chain: this.chain,
     })
+    await this.waitForTransaction(txHash, 'AgentWallet.depositGas')
+    this.logger.logDecision(`Gas funded: ${amountEth} ETH`)
+    return txHash
   }
 
-  // ─── x402 fetch ──────────────────────────────────────────────────────────────
+  async depositToEntryPoint(amountEth: string): Promise<Address> {
+    const txHash = await this.writeContractAndWait({
+      address: ENTRY_POINT,
+      abi: ENTRY_POINT_ABI,
+      functionName: 'depositTo',
+      args: [this.walletAddress],
+      value: parseEther(amountEth),
+      context: 'AgentWallet.depositToEntryPoint',
+    })
+    this.logger.logDecision(`EntryPoint deposit: ${amountEth} ETH`)
+    return txHash
+  }
 
-  /**
-   * Returns a `fetch` wrapper that automatically handles HTTP 402 responses
-   * by paying via this wallet and retrying the request.
-   */
+  async getEthBalance(): Promise<string> {
+    const raw = await this.publicClient.getBalance({ address: this.walletAddress })
+    return formatEther(raw)
+  }
+
+  async getEntryPointDeposit(): Promise<string> {
+    const raw = (await this.publicClient.readContract({
+      address: ENTRY_POINT,
+      abi: ENTRY_POINT_ABI,
+      functionName: 'balanceOf',
+      args: [this.walletAddress],
+    })) as bigint
+    return formatEther(raw)
+  }
+
+  async getBalance(): Promise<string> {
+    const raw = (await this.publicClient.readContract({
+      address: this.usdcAddress,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [this.walletAddress],
+    })) as bigint
+
+    return fromUSDC(raw)
+  }
+
+  async getDailySpent(): Promise<string> {
+    const raw = (await this.publicClient.readContract({
+      address: this.walletAddress,
+      abi: AGENT_WALLET_ABI,
+      functionName: 'dailySpent',
+    })) as bigint
+
+    return fromUSDC(raw)
+  }
+
+  async isActive(): Promise<boolean> {
+    return (await this.publicClient.readContract({
+      address: this.registryAddr,
+      abi: AGENT_REGISTRY_ABI,
+      functionName: 'isActive',
+      args: [this.agentId],
+    })) as boolean
+  }
+
+  async getOnChainRecord(): Promise<AgentRecord> {
+    return (await this.publicClient.readContract({
+      address: this.registryAddr,
+      abi: AGENT_REGISTRY_ABI,
+      functionName: 'getAgent',
+      args: [this.agentId],
+    })) as AgentRecord
+  }
+
+  async pause(): Promise<Address> {
+    const txHash = await this.writeRegistry('pauseAgent', [this.agentId])
+    this.logger.logDecision('Agent paused in registry')
+    return txHash
+  }
+
+  async resume(): Promise<Address> {
+    const txHash = await this.writeRegistry('resumeAgent', [this.agentId])
+    this.logger.logDecision('Agent resumed in registry')
+    return txHash
+  }
+
+  async revoke(): Promise<Address> {
+    const txHash = await this.writeRegistry('revokeAgent', [this.agentId])
+    this.logger.logDecision('Agent permanently revoked in registry')
+    return txHash
+  }
+
+  async updateManifest(newManifestHash: Bytes32): Promise<Address> {
+    assertBytes32(newManifestHash, 'manifest hash')
+    const txHash = await this.writeRegistry('updateManifest', [
+      this.agentId,
+      newManifestHash,
+    ])
+    this.logger.logDecision(`Manifest updated: ${newManifestHash}`)
+    return txHash
+  }
+
+  async updateLimits(dailyLimit: string, perTxLimit: string): Promise<Address> {
+    const txHash = await this.writeWallet('updateLimits', [
+      toUSDC(dailyLimit),
+      toUSDC(perTxLimit),
+    ])
+    this.logger.logDecision(
+      `Limits updated: daily ${dailyLimit} USDC, per-tx ${perTxLimit} USDC`,
+    )
+    return txHash
+  }
+
+  async allowRecipient(recipient: Address): Promise<Address> {
+    assertAddress(recipient, 'recipient')
+    const txHash = await this.writeWallet('allowRecipient', [recipient])
+    this.logger.logDecision(`Allowlist added: ${recipient}`)
+    return txHash
+  }
+
+  async blockRecipient(recipient: Address): Promise<Address> {
+    assertAddress(recipient, 'recipient')
+    const txHash = await this.writeWallet('blockRecipient', [recipient])
+    this.logger.logDecision(`Allowlist blocked: ${recipient}`)
+    return txHash
+  }
+
+  async disableAllowlist(): Promise<Address> {
+    const txHash = await this.writeWallet('disableAllowlist')
+    this.logger.logDecision('Allowlist disabled')
+    return txHash
+  }
+
   getX402Fetch() {
     return createX402Fetch({
       onPaymentRequired: async (required) => {
-        const resp = await this.pay({
-          to:       required.payTo,
-          amount:   required.amount,
+        const response = await this.pay({
+          to: required.payTo,
+          amount: required.amount,
           currency: 'USDC',
-          memo:     `x402: ${required.resource}`,
+          memo: `x402: ${required.resource}`,
         })
-        return { txHash: resp.hash, amount: required.amount }
+
+        return {
+          txHash: response.hash,
+          amount: required.amount,
+        }
       },
       onPaymentSuccess: (required, txHash) => {
-        console.log(`[Actant] x402 payment: ${required.amount} USDC → ${required.payTo} (${txHash})`)
+        this.logger.logDecision(
+          `x402 payment: ${required.amount} USDC to ${required.payTo} (${txHash})`,
+        )
       },
     })
   }
 
-  // ─── Internal ────────────────────────────────────────────────────────────────
+  private async writeWallet(
+    functionName: string,
+    args: readonly unknown[] = [],
+  ): Promise<Address> {
+    return this.writeContractAndWait({
+      address: this.walletAddress,
+      abi: AGENT_WALLET_ABI,
+      functionName,
+      args,
+      context: `AgentWallet.${functionName}`,
+    })
+  }
 
-  /**
-   * Extract the logHash from the PaymentSent event in a transaction receipt.
-   *
-   * PaymentSent(address indexed to, uint256 amount, string memo, bytes32 logHash)
-   *
-   * ABI encoding of non-indexed fields (amount, memo, logHash):
-   *   word 0 (bytes  0–31): amount     (uint256, static)
-   *   word 1 (bytes 32–63): memo offset (dynamic pointer)
-   *   word 2 (bytes 64–95): logHash    (bytes32, static)  ← we want this
-   *
-   * We identify the log by matching topics[0] to the PaymentSent event signature
-   * so we never accidentally read the USDC Transfer log that precedes it.
-   */
-  private _extractLogHash(
-    logs: readonly { topics: readonly `0x${string}`[]; data: `0x${string}` }[],
-  ): `0x${string}` | null {
-    for (const log of logs) {
-      if (log.topics[0] !== PAYMENT_SENT_TOPIC) continue
+  private async writeRegistry(
+    functionName: string,
+    args: readonly unknown[] = [],
+  ): Promise<Address> {
+    return this.writeContractAndWait({
+      address: this.registryAddr,
+      abi: AGENT_REGISTRY_ABI,
+      functionName,
+      args,
+      context: `AgentWallet.${functionName}`,
+    })
+  }
 
-      const dataHex = log.data.slice(2) // strip 0x
-      if (dataHex.length < 192) continue // need at least 3 × 32 bytes (96 bytes = 192 hex chars)
+  private async writeContractAndWait(params: {
+    address: Address
+    abi: readonly unknown[]
+    functionName: string
+    args?: readonly unknown[]
+    value?: bigint
+    context: string
+  }): Promise<Address> {
+    const txHash = await this.walletClient.writeContract({
+      address: params.address,
+      abi: params.abi,
+      functionName: params.functionName,
+      args: params.args,
+      value: params.value,
+      chain: this.chain,
+    })
 
-      // logHash is word 2 (bytes 64–95 = hex chars 128–191)
-      return `0x${dataHex.slice(128, 192)}` as `0x${string}`
+    await this.waitForTransaction(txHash, params.context)
+    return txHash
+  }
+
+  private async waitForTransaction(txHash: Address, context: string): Promise<void> {
+    await AgentWallet.waitForSuccessReceipt(this.publicClient, txHash, context)
+  }
+
+  private async sendViaUserOperation(callData: Address): Promise<Address> {
+    if (!this.bundlerUrl) {
+      throw new Error('Bundler URL is required for UserOperation flow')
     }
+
+    const nonce = (await this.publicClient.readContract({
+      address: ENTRY_POINT,
+      abi: ENTRY_POINT_ABI,
+      functionName: 'getNonce',
+      args: [this.walletAddress, 0n],
+    })) as bigint
+
+    const feeData = await this.publicClient.estimateFeesPerGas()
+
+    const partial: UserOperation = {
+      sender: this.walletAddress,
+      nonce,
+      initCode: '0x',
+      callData,
+      callGasLimit: 200_000n,
+      verificationGasLimit: 200_000n,
+      preVerificationGas: 50_000n,
+      maxFeePerGas: feeData.maxFeePerGas ?? DEFAULT_MAX_FEE_PER_GAS,
+      maxPriorityFeePerGas:
+        feeData.maxPriorityFeePerGas ?? DEFAULT_MAX_PRIORITY_FEE_PER_GAS,
+      paymasterAndData: '0x',
+      signature: '0x',
+    }
+
+    const estimatedGas = await estimateUserOpGas(this.bundlerUrl, partial)
+
+    const finalOp: UserOperation = {
+      ...partial,
+      callGasLimit:
+        (estimatedGas.callGasLimit * GAS_BUFFER_MULTIPLIER) / GAS_BUFFER_DIVISOR,
+      verificationGasLimit:
+        (estimatedGas.verificationGasLimit * GAS_BUFFER_MULTIPLIER) /
+        GAS_BUFFER_DIVISOR,
+      preVerificationGas:
+        (estimatedGas.preVerificationGas * GAS_BUFFER_MULTIPLIER) /
+        GAS_BUFFER_DIVISOR,
+    }
+
+    finalOp.signature = await this.signUserOperation(finalOp)
+
+    const userOpHash = await sendUserOperation(this.bundlerUrl, finalOp)
+    const receipt = await waitForUserOpReceipt(this.bundlerUrl, userOpHash)
+
+    return receipt.receipt.transactionHash
+  }
+
+  private async signUserOperation(userOp: UserOperation): Promise<Address> {
+    if (this.account.signMessage) {
+      return signUserOp(userOp, this.account, this.chainId)
+    }
+
+    if (this.walletClient.signMessage) {
+      const hash = getUserOpHash(userOp, this.chainId)
+      return this.walletClient.signMessage({
+        account: this.account.address,
+        message: { raw: hash },
+      })
+    }
+
+    throw new Error('Connected wallet client cannot sign UserOperations')
+  }
+
+  private extractPaymentLogHash(
+    logs: readonly { topics: readonly Address[]; data: Address }[],
+  ): Address | null {
+    for (const log of logs) {
+      if (log.topics[0] !== PAYMENT_SENT_TOPIC) {
+        continue
+      }
+
+      const dataHex = log.data.slice(2)
+      if (dataHex.length < 192) {
+        continue
+      }
+
+      return `0x${dataHex.slice(128, 192)}` as Address
+    }
+
     return null
+  }
+
+  private static async waitForSuccessReceipt(
+    publicClient: ReturnType<typeof createPublicClient>,
+    txHash: Address,
+    context: string,
+  ): Promise<void> {
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+    if (receipt.status !== 'success') {
+      throw new Error(`${context}: transaction reverted — ${txHash}`)
+    }
   }
 }

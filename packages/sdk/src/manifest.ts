@@ -1,37 +1,44 @@
 import { keccak256, toHex } from 'viem'
 import type { AgentManifest, AgentCapability, AgentSafetyPolicy, WalletConfig } from '@agentpay/shared'
 
-/**
- * Builds an ERC-8004 agent capability manifest (agent.json).
- *
- * The manifest is stored off-chain. Its keccak256 hash is committed on-chain
- * in AgentRegistry, creating a tamper-evident link between the on-chain identity
- * and the off-chain capability declaration.
- */
+const DEFAULT_DAILY_LIMIT = '50.00'
+const DEFAULT_PER_TX_LIMIT = '5.00'
+const DEFAULT_FRAMEWORKS = ['@actant/sdk', 'langchain', 'crewai'] as const
+
 export function buildManifest(params: {
-  agentId:    string
-  name:       string
-  version?:   string
+  agentId: string
+  name: string
+  version?: string
   description: string
-  operator:   `0x${string}`
-  wallet:     `0x${string}`
-  chainId:    number
-  config:     WalletConfig
+  operator: `0x${string}`
+  wallet: `0x${string}`
+  chainId: number
+  config: WalletConfig
   capabilities?: AgentCapability[]
   frameworks?: string[]
 }): AgentManifest {
   const {
-    agentId, name, version = '1.0.0', description,
-    operator, wallet, chainId, config, frameworks = [],
+    agentId,
+    name,
+    version = '1.0.0',
+    description,
+    operator,
+    wallet,
+    chainId,
+    config,
+    frameworks = [],
   } = params
 
+  const dailyLimit = config.spendingLimit?.daily ?? DEFAULT_DAILY_LIMIT
+  const perTxLimit = config.spendingLimit?.perTx ?? DEFAULT_PER_TX_LIMIT
+
   const safetyPolicy: AgentSafetyPolicy = {
-    dailySpendLimit:       config.spendingLimit?.daily  ?? '50.00',
-    perTxLimit:            config.spendingLimit?.perTx  ?? '5.00',
+    dailySpendLimit: dailyLimit,
+    perTxLimit,
     restrictedToAllowlist: (config.allowedRecipients?.length ?? 0) > 0,
     guardrails: [
-      `Daily spend capped at ${config.spendingLimit?.daily ?? '50.00'} USDC`,
-      `Per-transaction cap: ${config.spendingLimit?.perTx ?? '5.00'} USDC`,
+      `Daily spend capped at ${dailyLimit} USDC`,
+      `Per-transaction cap: ${perTxLimit} USDC`,
       'On-chain spend policy enforced before value moves',
       'Operator can pause execution authority instantly',
       'All settlements logged on-chain for audit',
@@ -42,7 +49,7 @@ export function buildManifest(params: {
     {
       name:        'pay',
       description: 'Send USDC to a recipient address',
-      maxAmount:   config.spendingLimit?.perTx ?? '5.00',
+      maxAmount:   perTxLimit,
       currency:    'USDC',
       allowlist:   config.allowedRecipients,
     },
@@ -58,24 +65,17 @@ export function buildManifest(params: {
     wallet,
     chainId,
     capabilities,
-    frameworks: frameworks.length > 0 ? frameworks : ['@actant/sdk', 'langchain', 'crewai'],
+    frameworks: frameworks.length > 0 ? frameworks : [...DEFAULT_FRAMEWORKS],
     safetyPolicy,
     createdAt: new Date().toISOString(),
   }
 }
 
-/**
- * Compute the keccak256 hash of a manifest (what gets stored on-chain).
- */
 export function hashManifest(manifest: AgentManifest): `0x${string}` {
-  const json = JSON.stringify(manifest, null, 0)
+  const json = JSON.stringify(manifest)
   return keccak256(toHex(json))
 }
 
-/**
- * Compute the bytes32 agentId from a name + operator + salt.
- * This should match the on-chain agentId used in AgentRegistry.
- */
 export function computeAgentId(
   name: string,
   operator: `0x${string}`,

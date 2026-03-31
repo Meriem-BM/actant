@@ -1,12 +1,13 @@
-/**
- * Contract ABIs for Actant on-chain contracts.
- * Minimal — only the functions the SDK needs to call.
- */
-
 export const AGENT_WALLET_ABI = [
-  // Read
   {
     name: 'owner',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    name: 'registry',
     type: 'function',
     stateMutability: 'view',
     inputs: [],
@@ -18,6 +19,13 @@ export const AGENT_WALLET_ABI = [
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'bytes32' }],
+  },
+  {
+    name: 'usdc',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
   },
   {
     name: 'dailyLimit',
@@ -41,13 +49,43 @@ export const AGENT_WALLET_ABI = [
     outputs: [{ name: '', type: 'uint256' }],
   },
   {
+    name: 'windowStart',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'hasAllowlist',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'allowedRecipients',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'recipient', type: 'address' }],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
     name: 'getNonce',
     type: 'function',
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
   },
-  // Write
+  {
+    name: 'isValidSignature',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'hash',      type: 'bytes32' },
+      { name: 'signature', type: 'bytes'   },
+    ],
+    outputs: [{ name: '', type: 'bytes4' }],
+  },
   {
     name: 'pay',
     type: 'function',
@@ -64,9 +102,20 @@ export const AGENT_WALLET_ABI = [
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
-      { name: 'to',   type: 'address' },
+      { name: 'to',    type: 'address' },
       { name: 'value', type: 'uint256' },
       { name: 'data',  type: 'bytes'   },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'executeBatch',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'targets', type: 'address[]' },
+      { name: 'values',  type: 'uint256[]' },
+      { name: 'datas',   type: 'bytes[]'   },
     ],
     outputs: [],
   },
@@ -87,7 +136,30 @@ export const AGENT_WALLET_ABI = [
     inputs: [{ name: 'recipient', type: 'address' }],
     outputs: [],
   },
-  // Events
+  {
+    name: 'blockRecipient',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'recipient', type: 'address' }],
+    outputs: [],
+  },
+  {
+    name: 'disableAllowlist',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [],
+  },
+  {
+    name: 'withdrawETH',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to',     type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
   {
     name: 'PaymentSent',
     type: 'event',
@@ -98,10 +170,37 @@ export const AGENT_WALLET_ABI = [
       { name: 'logHash', type: 'bytes32', indexed: false },
     ],
   },
+  {
+    name: 'LimitsUpdated',
+    type: 'event',
+    inputs: [
+      { name: 'dailyLimit', type: 'uint256', indexed: false },
+      { name: 'perTxLimit', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    name: 'RecipientAllowed',
+    type: 'event',
+    inputs: [{ name: 'recipient', type: 'address', indexed: true }],
+  },
+  {
+    name: 'RecipientBlocked',
+    type: 'event',
+    inputs: [{ name: 'recipient', type: 'address', indexed: true }],
+  },
+  {
+    name: 'AllowlistEnabled',
+    type: 'event',
+    inputs: [],
+  },
+  {
+    name: 'AllowlistDisabled',
+    type: 'event',
+    inputs: [],
+  },
 ] as const
 
 export const AGENT_REGISTRY_ABI = [
-  // Read
   {
     name: 'getAgent',
     type: 'function',
@@ -130,13 +229,40 @@ export const AGENT_REGISTRY_ABI = [
     outputs: [{ name: '', type: 'bool' }],
   },
   {
+    name: 'getWallet',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    name: 'getOperator',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
     name: 'getAgentsByOperator',
     type: 'function',
     stateMutability: 'view',
     inputs: [{ name: 'operator', type: 'address' }],
     outputs: [{ name: '', type: 'bytes32[]' }],
   },
-  // Write
+  {
+    name: 'trustedFactories',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'factory', type: 'address' }],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'owner',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
   {
     name: 'registerAgent',
     type: 'function',
@@ -171,6 +297,16 @@ export const AGENT_REGISTRY_ABI = [
     outputs: [],
   },
   {
+    name: 'updateManifest',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId',         type: 'bytes32' },
+      { name: 'newManifestHash', type: 'bytes32' },
+    ],
+    outputs: [],
+  },
+  {
     name: 'logExecution',
     type: 'function',
     stateMutability: 'nonpayable',
@@ -182,7 +318,13 @@ export const AGENT_REGISTRY_ABI = [
     ],
     outputs: [],
   },
-  // Events
+  {
+    name: 'addFactory',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'factory', type: 'address' }],
+    outputs: [],
+  },
   {
     name: 'AgentRegistered',
     type: 'event',
@@ -191,6 +333,39 @@ export const AGENT_REGISTRY_ABI = [
       { name: 'wallet',       type: 'address', indexed: true  },
       { name: 'operator',     type: 'address', indexed: true  },
       { name: 'manifestHash', type: 'bytes32', indexed: false },
+    ],
+  },
+  {
+    name: 'AgentPaused',
+    type: 'event',
+    inputs: [
+      { name: 'agentId', type: 'bytes32', indexed: true },
+      { name: 'by',      type: 'address', indexed: true },
+    ],
+  },
+  {
+    name: 'AgentResumed',
+    type: 'event',
+    inputs: [
+      { name: 'agentId', type: 'bytes32', indexed: true },
+      { name: 'by',      type: 'address', indexed: true },
+    ],
+  },
+  {
+    name: 'AgentRevoked',
+    type: 'event',
+    inputs: [
+      { name: 'agentId', type: 'bytes32', indexed: true },
+      { name: 'by',      type: 'address', indexed: true },
+    ],
+  },
+  {
+    name: 'ManifestUpdated',
+    type: 'event',
+    inputs: [
+      { name: 'agentId', type: 'bytes32', indexed: true  },
+      { name: 'oldHash', type: 'bytes32', indexed: false },
+      { name: 'newHash', type: 'bytes32', indexed: false },
     ],
   },
   {
@@ -203,21 +378,45 @@ export const AGENT_REGISTRY_ABI = [
       { name: 'success',       type: 'bool',    indexed: false },
     ],
   },
+  {
+    name: 'ReputationUpdated',
+    type: 'event',
+    inputs: [
+      { name: 'agentId',  type: 'bytes32', indexed: true  },
+      { name: 'oldScore', type: 'uint16',  indexed: false },
+      { name: 'newScore', type: 'uint16',  indexed: false },
+    ],
+  },
 ] as const
 
 export const AGENT_WALLET_FACTORY_ABI = [
   {
-    name: 'createWallet',
+    name: 'implementation',
     type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'agentId',      type: 'bytes32' },
-      { name: 'owner',        type: 'address' },
-      { name: 'dailyLimit',   type: 'uint256' },
-      { name: 'perTxLimit',   type: 'uint256' },
-      { name: 'manifestHash', type: 'bytes32' },
-    ],
-    outputs: [{ name: 'wallet', type: 'address' }],
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    name: 'registry',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    name: 'usdc',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    name: 'wallets',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
   },
   {
     name: 'getWalletAddress',
@@ -230,11 +429,17 @@ export const AGENT_WALLET_FACTORY_ABI = [
     outputs: [{ name: 'predicted', type: 'address' }],
   },
   {
-    name: 'wallets',
+    name: 'createWallet',
     type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'agentId', type: 'bytes32' }],
-    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId',      type: 'bytes32' },
+      { name: 'owner',        type: 'address' },
+      { name: 'dailyLimit',   type: 'uint256' },
+      { name: 'perTxLimit',   type: 'uint256' },
+      { name: 'manifestHash', type: 'bytes32' },
+    ],
+    outputs: [{ name: 'wallet', type: 'address' }],
   },
   {
     name: 'WalletCreated',
@@ -273,5 +478,25 @@ export const ERC20_ABI = [
     stateMutability: 'view',
     inputs: [],
     outputs: [{ name: '', type: 'uint8' }],
+  },
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount',  type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner',   type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
   },
 ] as const
