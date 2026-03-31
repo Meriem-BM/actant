@@ -38,3 +38,4 @@ npm-debug.log*
 
 # Bun
 bun.lockb
+packages/contracts/deployment.env
