@@ -11,8 +11,8 @@ import {AgentRegistry} from "../src/AgentRegistry.sol";
  */
 contract MockERC20 {
     mapping(address => uint256) public balanceOf;
-    string public name   = "USD Coin";
-    string public symbol = "USDC";
+    string public name    = "USD Coin";
+    string public symbol  = "USDC";
     uint8  public decimals = 6;
 
     function mint(address to, uint256 amount) external {
@@ -35,10 +35,10 @@ contract MockERC20 {
 }
 
 contract AgentWalletTest is Test {
-    AgentRegistry     public registry;
+    AgentRegistry      public registry;
     AgentWalletFactory public factory;
-    AgentWallet       public wallet;
-    MockERC20         public usdc;
+    AgentWallet        public wallet;
+    MockERC20          public usdc;
 
     address owner    = makeAddr("owner");
     address operator = makeAddr("operator");
@@ -48,8 +48,8 @@ contract AgentWalletTest is Test {
     bytes32 constant AGENT_ID      = keccak256("trading-bot");
     bytes32 constant MANIFEST_HASH = keccak256("agent.json");
 
-    uint256 constant DAILY_LIMIT = 50_000_000;  // 50 USDC
-    uint256 constant PER_TX_LIMIT = 5_000_000;  // 5 USDC
+    uint256 constant DAILY_LIMIT  = 50_000_000; // 50 USDC
+    uint256 constant PER_TX_LIMIT =  5_000_000; //  5 USDC
 
     function setUp() public {
         usdc     = new MockERC20();
@@ -57,6 +57,9 @@ contract AgentWalletTest is Test {
 
         AgentWallet impl = new AgentWallet();
         factory = new AgentWalletFactory(address(impl), address(registry), address(usdc));
+
+        // Authorize factory in registry
+        registry.addFactory(address(factory));
 
         // Create wallet as operator
         vm.prank(operator);
@@ -85,12 +88,12 @@ contract AgentWalletTest is Test {
 
     function test_init_registeredInRegistry() public view {
         assertTrue(registry.isActive(AGENT_ID));
-        assertEq(registry.getWallet(AGENT_ID), address(wallet));
+        assertEq(registry.getWallet(AGENT_ID),   address(wallet));
         assertEq(registry.getOperator(AGENT_ID), operator);
     }
 
     function test_init_cannotReinitialize() public {
-        vm.expectRevert("AgentWallet: already initialized");
+        vm.expectRevert(AgentWallet.AlreadyInitialized.selector);
         wallet.initialize(alice, AGENT_ID, address(registry), address(usdc), 1, 1);
     }
 
@@ -108,7 +111,7 @@ contract AgentWalletTest is Test {
 
     function test_pay_exceedsPerTxLimit_reverts() public {
         vm.prank(owner);
-        vm.expectRevert("AgentWallet: exceeds per-tx limit");
+        vm.expectRevert(AgentWallet.ExceedsPerTxLimit.selector);
         wallet.pay(alice, PER_TX_LIMIT + 1, "too large");
     }
 
@@ -119,7 +122,7 @@ contract AgentWalletTest is Test {
             wallet.pay(alice, PER_TX_LIMIT, "batch");
         }
         // Next payment should fail (50 USDC daily limit reached)
-        vm.expectRevert("AgentWallet: daily limit exceeded");
+        vm.expectRevert(AgentWallet.DailyLimitExceeded.selector);
         wallet.pay(alice, 1_000_000, "over limit");
         vm.stopPrank();
     }
@@ -143,13 +146,13 @@ contract AgentWalletTest is Test {
 
     function test_pay_unauthorizedReverts() public {
         vm.prank(alice); // not owner or entrypoint
-        vm.expectRevert("AgentWallet: unauthorized");
+        vm.expectRevert(AgentWallet.Unauthorized.selector);
         wallet.pay(bob, 1_000_000, "unauthorized");
     }
 
     function test_pay_zeroAddressReverts() public {
         vm.prank(owner);
-        vm.expectRevert("AgentWallet: zero recipient");
+        vm.expectRevert(AgentWallet.ZeroRecipient.selector);
         wallet.pay(address(0), 1_000_000, "zero");
     }
 
@@ -157,7 +160,6 @@ contract AgentWalletTest is Test {
         vm.prank(owner);
         wallet.pay(alice, 1_000_000, "memo");
 
-        // Execution should be logged in registry
         assertEq(registry.getAgent(AGENT_ID).executionCount, 1);
         assertEq(registry.getAgent(AGENT_ID).totalSettled,   1_000_000);
     }
@@ -179,7 +181,7 @@ contract AgentWalletTest is Test {
         wallet.allowRecipient(alice);
 
         vm.prank(owner);
-        vm.expectRevert("AgentWallet: recipient not allowed");
+        vm.expectRevert(AgentWallet.RecipientNotAllowed.selector);
         wallet.pay(bob, 1_000_000, "blocked");
     }
 
@@ -200,7 +202,7 @@ contract AgentWalletTest is Test {
         registry.pauseAgent(AGENT_ID);
 
         vm.prank(owner);
-        vm.expectRevert("AgentWallet: agent paused or revoked");
+        vm.expectRevert(AgentWallet.AgentPausedOrRevoked.selector);
         wallet.pay(alice, 1_000_000, "paused");
     }
 
@@ -209,7 +211,7 @@ contract AgentWalletTest is Test {
         registry.revokeAgent(AGENT_ID);
 
         vm.prank(owner);
-        vm.expectRevert("AgentWallet: agent paused or revoked");
+        vm.expectRevert(AgentWallet.AgentPausedOrRevoked.selector);
         wallet.pay(alice, 1_000_000, "revoked");
     }
 
@@ -247,7 +249,7 @@ contract AgentWalletTest is Test {
 
     function test_createWallet_duplicateAgentIdReverts() public {
         vm.prank(operator);
-        vm.expectRevert("Factory: agentId already deployed");
+        vm.expectRevert(AgentWalletFactory.AgentIdAlreadyDeployed.selector);
         factory.createWallet(AGENT_ID, owner, DAILY_LIMIT, PER_TX_LIMIT, MANIFEST_HASH);
     }
 }

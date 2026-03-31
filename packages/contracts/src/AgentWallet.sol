@@ -23,17 +23,34 @@ import "./interfaces/IAgentRegistry.sol";
 contract AgentWallet is IAccount {
 
     // ------------------------------------------------------------
+    //                         Custom Errors
+    // ------------------------------------------------------------
+
+    error AlreadyInitialized();
+    error ZeroOwner();
+    error Unauthorized();
+    error NotEntryPoint();
+    error AgentPausedOrRevoked();
+    error ZeroRecipient();
+    error ZeroAmount();
+    error ExceedsPerTxLimit();
+    error DailyLimitExceeded();
+    error RecipientNotAllowed();
+    error DirectUSDCCallDisallowed();
+    error ArrayLengthMismatch();
+    error ExecutionFailed();
+    error ETHTransferFailed();
+    error BadSignatureLength();
+    error InvalidV();
+    error ECRecoverFailed();
+    error USDCTransferFailed();
+
+    // ------------------------------------------------------------
     //                         Constants
     // ------------------------------------------------------------
 
     /// @notice ERC-4337 EntryPoint v0.6 on Base.
     address public constant ENTRY_POINT = 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
-
-    /// @notice USDC on Base mainnet (6 decimals).
-    address public constant USDC_MAINNET = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
-
-    /// @notice USDC on Base Sepolia (6 decimals).
-    address public constant USDC_SEPOLIA = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
 
     uint256 private constant SIG_VALIDATION_FAILED  = 1;
     uint256 private constant SIG_VALIDATION_SUCCESS = 0;
@@ -98,19 +115,13 @@ contract AgentWallet is IAccount {
     // ------------------------------------------------------------
 
     modifier onlyOwnerOrEntryPoint() {
-        require(
-            msg.sender == owner || msg.sender == ENTRY_POINT,
-            "AgentWallet: unauthorized"
-        );
+        if (msg.sender != owner && msg.sender != ENTRY_POINT) revert Unauthorized();
         _;
     }
 
     modifier notPaused() {
         if (registry != address(0) && agentId != bytes32(0)) {
-            require(
-                IAgentRegistry(registry).isActive(agentId),
-                "AgentWallet: agent paused or revoked"
-            );
+            if (!IAgentRegistry(registry).isActive(agentId)) revert AgentPausedOrRevoked();
         }
         _;
     }
@@ -136,15 +147,15 @@ contract AgentWallet is IAccount {
         uint256 _dailyLimit,
         uint256 _perTxLimit
     ) external {
-        require(owner == address(0), "AgentWallet: already initialized");
-        require(_owner != address(0), "AgentWallet: zero owner");
+        if (owner != address(0)) revert AlreadyInitialized();
+        if (_owner == address(0)) revert ZeroOwner();
 
-        owner      = _owner;
-        agentId    = _agentId;
-        registry   = _registry;
-        usdc       = _usdc;
-        dailyLimit = _dailyLimit;
-        perTxLimit = _perTxLimit;
+        owner       = _owner;
+        agentId     = _agentId;
+        registry    = _registry;
+        usdc        = _usdc;
+        dailyLimit  = _dailyLimit;
+        perTxLimit  = _perTxLimit;
         windowStart = _startOfDay(block.timestamp);
 
         emit Initialized(_owner, _agentId, _dailyLimit, _perTxLimit);
@@ -162,20 +173,18 @@ contract AgentWallet is IAccount {
         bytes32 userOpHash,
         uint256 missingAccountFunds
     ) external override returns (uint256 validationData) {
-        require(msg.sender == ENTRY_POINT, "AgentWallet: not EntryPoint");
+        if (msg.sender != ENTRY_POINT) revert NotEntryPoint();
 
         bytes32 ethHash = keccak256(
             abi.encodePacked("\x19Ethereum Signed Message:\n32", userOpHash)
         );
         address recovered = _recoverSigner(ethHash, userOp.signature);
 
-        if (recovered != owner) {
-            return SIG_VALIDATION_FAILED;
-        }
+        if (recovered != owner) return SIG_VALIDATION_FAILED;
 
         if (missingAccountFunds > 0) {
             (bool ok,) = payable(ENTRY_POINT).call{value: missingAccountFunds}("");
-            require(ok, "AgentWallet: ETH transfer to EntryPoint failed");
+            if (!ok) revert ETHTransferFailed();
         }
 
         return SIG_VALIDATION_SUCCESS;
@@ -193,17 +202,14 @@ contract AgentWallet is IAccount {
         uint256 value,
         bytes calldata data
     ) external onlyOwnerOrEntryPoint notPaused {
-        require(
-            to != usdc,
-            "AgentWallet: direct USDC calls disallowed — use pay()"
-        );
+        if (to == usdc) revert DirectUSDCCallDisallowed();
 
         (bool success, bytes memory returnData) = to.call{value: value}(data);
         if (!success) {
             if (returnData.length > 0) {
                 assembly { revert(add(returnData, 32), mload(returnData)) }
             }
-            revert("AgentWallet: execution failed");
+            revert ExecutionFailed();
         }
     }
 
@@ -217,22 +223,21 @@ contract AgentWallet is IAccount {
         uint256[] calldata values,
         bytes[]   calldata datas
     ) external onlyOwnerOrEntryPoint notPaused {
-        require(
-            targets.length == values.length && values.length == datas.length,
-            "AgentWallet: array length mismatch"
-        );
-        for (uint256 i = 0; i < targets.length; i++) {
-            require(
-                targets[i] != usdc,
-                "AgentWallet: direct USDC calls disallowed — use pay()"
-            );
+        uint256 len = targets.length;
+        if (len != values.length || len != datas.length) revert ArrayLengthMismatch();
+
+        for (uint256 i = 0; i < len;) {
+            if (targets[i] == usdc) revert DirectUSDCCallDisallowed();
+
             (bool ok, bytes memory ret) = targets[i].call{value: values[i]}(datas[i]);
             if (!ok) {
                 if (ret.length > 0) {
                     assembly { revert(add(ret, 32), mload(ret)) }
                 }
-                revert("AgentWallet: batch execution failed");
+                revert ExecutionFailed();
             }
+
+            unchecked { ++i; }
         }
     }
 
@@ -258,9 +263,9 @@ contract AgentWallet is IAccount {
         uint256 amount,
         string calldata memo
     ) external onlyOwnerOrEntryPoint notPaused {
-        require(to     != address(0), "AgentWallet: zero recipient");
-        require(amount > 0,           "AgentWallet: zero amount");
-        require(amount <= perTxLimit, "AgentWallet: exceeds per-tx limit");
+        if (to == address(0))   revert ZeroRecipient();
+        if (amount == 0)        revert ZeroAmount();
+        if (amount > perTxLimit) revert ExceedsPerTxLimit();
 
         // Reset daily window if a new UTC day has started
         uint256 today = _startOfDay(block.timestamp);
@@ -269,14 +274,13 @@ contract AgentWallet is IAccount {
             dailySpent  = 0;
         }
 
-        require(dailySpent + amount <= dailyLimit, "AgentWallet: daily limit exceeded");
+        if (dailySpent + amount > dailyLimit) revert DailyLimitExceeded();
 
-        if (hasAllowlist) {
-            require(allowedRecipients[to], "AgentWallet: recipient not allowed");
-        }
+        if (hasAllowlist && !allowedRecipients[to]) revert RecipientNotAllowed();
 
-        dailySpent += amount;
-        require(IERC20(usdc).transfer(to, amount), "AgentWallet: USDC transfer failed");
+        unchecked { dailySpent += amount; }
+
+        if (!IERC20(usdc).transfer(to, amount)) revert USDCTransferFailed();
 
         // Build log hash — committed to registry for ERC-8004 audit trail
         bytes32 logHash = keccak256(abi.encode(
@@ -321,7 +325,7 @@ contract AgentWallet is IAccount {
 
     function withdrawETH(address payable to, uint256 amount) external onlyOwnerOrEntryPoint {
         (bool ok,) = to.call{value: amount}("");
-        require(ok, "AgentWallet: ETH withdraw failed");
+        if (!ok) revert ETHTransferFailed();
     }
 
     // ------------------------------------------------------------
@@ -352,13 +356,14 @@ contract AgentWallet is IAccount {
     // ------------------------------------------------------------
 
     function _startOfDay(uint256 timestamp) internal pure returns (uint256) {
-        return (timestamp / 1 days) * 1 days;
+        unchecked { return (timestamp / 1 days) * 1 days; }
     }
 
     function _recoverSigner(bytes32 hash, bytes memory sig)
         internal pure returns (address)
     {
-        require(sig.length == 65, "AgentWallet: bad signature length");
+        if (sig.length != 65) revert BadSignatureLength();
+
         bytes32 r;
         bytes32 s;
         uint8   v;
@@ -367,10 +372,11 @@ contract AgentWallet is IAccount {
             s := mload(add(sig, 64))
             v := byte(0, mload(add(sig, 96)))
         }
-        if (v < 27) v += 27;
-        require(v == 27 || v == 28, "AgentWallet: invalid v");
+        unchecked { if (v < 27) v += 27; }
+        if (v != 27 && v != 28) revert InvalidV();
+
         address signer = ecrecover(hash, v, r, s);
-        require(signer != address(0), "AgentWallet: ecrecover failed");
+        if (signer == address(0)) revert ECRecoverFailed();
         return signer;
     }
 }

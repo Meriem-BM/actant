@@ -21,6 +21,18 @@ import "./interfaces/IAgentRegistry.sol";
 contract AgentWalletFactory {
 
     // ------------------------------------------------------------
+    //                         Custom Errors
+    // ------------------------------------------------------------
+
+    error AgentIdAlreadyDeployed();
+    error ZeroOwner();
+    error ZeroDailyLimit();
+    error ZeroPerTxLimit();
+    error PerTxExceedsDaily();
+    error EmptyManifest();
+    error CREATE2Failed();
+
+    // ------------------------------------------------------------
     //                       State Variables
     // ------------------------------------------------------------
 
@@ -79,12 +91,12 @@ contract AgentWalletFactory {
         uint256 perTxLimit,
         bytes32 manifestHash
     ) external returns (address wallet) {
-        require(wallets[agentId] == address(0), "Factory: agentId already deployed");
-        require(owner        != address(0), "Factory: zero owner");
-        require(dailyLimit   > 0,           "Factory: zero daily limit");
-        require(perTxLimit   > 0,           "Factory: zero per-tx limit");
-        require(perTxLimit   <= dailyLimit,  "Factory: perTx > daily");
-        require(manifestHash != bytes32(0), "Factory: empty manifest");
+        if (wallets[agentId] != address(0)) revert AgentIdAlreadyDeployed();
+        if (owner        == address(0)) revert ZeroOwner();
+        if (dailyLimit   == 0)          revert ZeroDailyLimit();
+        if (perTxLimit   == 0)          revert ZeroPerTxLimit();
+        if (perTxLimit   > dailyLimit)  revert PerTxExceedsDaily();
+        if (manifestHash == bytes32(0)) revert EmptyManifest();
 
         bytes32 salt = keccak256(abi.encode(agentId, owner));
         wallet = _cloneDeterministic(implementation, salt);
@@ -128,7 +140,7 @@ contract AgentWalletFactory {
         assembly {
             instance := create2(0, add(creationCode, 32), mload(creationCode), salt)
         }
-        require(instance != address(0), "Factory: CREATE2 failed");
+        if (instance == address(0)) revert CREATE2Failed();
     }
 
     function _predictCloneAddress(address impl, bytes32 salt)

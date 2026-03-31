@@ -19,6 +19,24 @@ import "./interfaces/IAgentRegistry.sol";
 contract AgentRegistry is IAgentRegistry {
 
     // ------------------------------------------------------------
+    //                         Custom Errors
+    // ------------------------------------------------------------
+
+    error NotOwner();
+    error NotOperator();
+    error AgentNotFound();
+    error AgentRevoked();
+    error AgentIdTaken();
+    error ZeroWallet();
+    error ZeroOperator();
+    error EmptyManifest();
+    error ZeroFactory();
+    error UnauthorizedCaller();
+    error UnauthorizedLogger();
+    error NotActive();
+    error NotPaused();
+
+    // ------------------------------------------------------------
     //                       State Variables
     // ------------------------------------------------------------
 
@@ -38,22 +56,22 @@ contract AgentRegistry is IAgentRegistry {
     // ------------------------------------------------------------
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "AgentRegistry: not owner");
+        if (msg.sender != owner) revert NotOwner();
         _;
     }
 
     modifier onlyOperator(bytes32 agentId) {
-        require(_agents[agentId].operator == msg.sender, "AgentRegistry: not operator");
+        if (_agents[agentId].operator != msg.sender) revert NotOperator();
         _;
     }
 
     modifier agentExists(bytes32 agentId) {
-        require(_agents[agentId].registeredAt != 0, "AgentRegistry: agent not found");
+        if (_agents[agentId].registeredAt == 0) revert AgentNotFound();
         _;
     }
 
     modifier agentNotRevoked(bytes32 agentId) {
-        require(_agents[agentId].status != Status.Revoked, "AgentRegistry: agent revoked");
+        if (_agents[agentId].status == Status.Revoked) revert AgentRevoked();
         _;
     }
 
@@ -74,7 +92,7 @@ contract AgentRegistry is IAgentRegistry {
      * @dev    Call this once per deployed AgentWalletFactory after it is deployed.
      */
     function addFactory(address factory) external onlyOwner {
-        require(factory != address(0), "AgentRegistry: zero factory");
+        if (factory == address(0)) revert ZeroFactory();
         trustedFactories[factory] = true;
     }
 
@@ -98,14 +116,11 @@ contract AgentRegistry is IAgentRegistry {
         address operator,
         bytes32 manifestHash
     ) external override {
-        require(
-            msg.sender == operator || trustedFactories[msg.sender],
-            "AgentRegistry: caller must be operator or trusted factory"
-        );
-        require(_agents[agentId].registeredAt == 0, "AgentRegistry: agentId taken");
-        require(wallet       != address(0), "AgentRegistry: zero wallet");
-        require(operator     != address(0), "AgentRegistry: zero operator");
-        require(manifestHash != bytes32(0), "AgentRegistry: empty manifest");
+        if (msg.sender != operator && !trustedFactories[msg.sender]) revert UnauthorizedCaller();
+        if (_agents[agentId].registeredAt != 0) revert AgentIdTaken();
+        if (wallet       == address(0)) revert ZeroWallet();
+        if (operator     == address(0)) revert ZeroOperator();
+        if (manifestHash == bytes32(0)) revert EmptyManifest();
 
         _agents[agentId] = AgentRecord({
             wallet:          wallet,
@@ -143,25 +158,24 @@ contract AgentRegistry is IAgentRegistry {
     ) external override agentExists(agentId) {
         AgentRecord storage agent = _agents[agentId];
 
-        require(
-            msg.sender == agent.wallet || msg.sender == agent.operator,
-            "AgentRegistry: unauthorized logger"
-        );
+        if (msg.sender != agent.wallet && msg.sender != agent.operator) revert UnauthorizedLogger();
 
-        agent.lastActiveAt    = uint64(block.timestamp);
-        agent.executionCount += 1;
+        agent.lastActiveAt = uint64(block.timestamp);
+
+        unchecked { agent.executionCount += 1; }
 
         if (amountSettled > 0) {
-            agent.totalSettled += uint128(amountSettled);
+            unchecked { agent.totalSettled += uint128(amountSettled); }
         }
 
         // Update reputation — simple EMA: weight 95% history, 5% new result
         // success = +10000 bps signal, failure = 0 bps signal
-        uint16 signal   = success ? 10000 : 0;
-        uint16 newScore = uint16(
-            (uint256(agent.reputationScore) * 95 + uint256(signal) * 5) / 100
-        );
         uint16 oldScore = agent.reputationScore;
+        uint16 newScore;
+        unchecked {
+            uint256 signal = success ? 10000 : 0;
+            newScore = uint16((uint256(oldScore) * 95 + signal * 5) / 100);
+        }
         agent.reputationScore = newScore;
 
         emit ExecutionLogged(agentId, logHash, amountSettled, success);
@@ -174,7 +188,7 @@ contract AgentRegistry is IAgentRegistry {
     function pauseAgent(bytes32 agentId)
         external override agentExists(agentId) onlyOperator(agentId) agentNotRevoked(agentId)
     {
-        require(_agents[agentId].status == Status.Active, "AgentRegistry: not active");
+        if (_agents[agentId].status != Status.Active) revert NotActive();
         _agents[agentId].status = Status.Paused;
         emit AgentPaused(agentId, msg.sender);
     }
@@ -182,7 +196,7 @@ contract AgentRegistry is IAgentRegistry {
     function resumeAgent(bytes32 agentId)
         external override agentExists(agentId) onlyOperator(agentId) agentNotRevoked(agentId)
     {
-        require(_agents[agentId].status == Status.Paused, "AgentRegistry: not paused");
+        if (_agents[agentId].status != Status.Paused) revert NotPaused();
         _agents[agentId].status = Status.Active;
         emit AgentResumed(agentId, msg.sender);
     }
@@ -197,7 +211,7 @@ contract AgentRegistry is IAgentRegistry {
     function updateManifest(bytes32 agentId, bytes32 newManifestHash)
         external override agentExists(agentId) onlyOperator(agentId) agentNotRevoked(agentId)
     {
-        require(newManifestHash != bytes32(0), "AgentRegistry: empty manifest");
+        if (newManifestHash == bytes32(0)) revert EmptyManifest();
         bytes32 old = _agents[agentId].manifestHash;
         _agents[agentId].manifestHash = newManifestHash;
         emit ManifestUpdated(agentId, old, newManifestHash);

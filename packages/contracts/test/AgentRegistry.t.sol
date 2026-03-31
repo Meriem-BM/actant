@@ -26,10 +26,10 @@ contract AgentRegistryTest is Test {
         registry.registerAgent(AGENT_ID, wallet, operator, MANIFEST_HASH);
 
         IAgentRegistry.AgentRecord memory rec = registry.getAgent(AGENT_ID);
-        assertEq(rec.wallet,       wallet);
-        assertEq(rec.operator,     operator);
-        assertEq(rec.manifestHash, MANIFEST_HASH);
-        assertEq(uint8(rec.status), uint8(IAgentRegistry.Status.Active));
+        assertEq(rec.wallet,          wallet);
+        assertEq(rec.operator,        operator);
+        assertEq(rec.manifestHash,    MANIFEST_HASH);
+        assertEq(uint8(rec.status),   uint8(IAgentRegistry.Status.Active));
         assertEq(rec.reputationScore, 5000); // starts at 50%
     }
 
@@ -46,13 +46,20 @@ contract AgentRegistryTest is Test {
         registry.registerAgent(AGENT_ID, wallet, operator, MANIFEST_HASH);
 
         vm.prank(operator);
-        vm.expectRevert("AgentRegistry: agentId taken");
+        vm.expectRevert(AgentRegistry.AgentIdTaken.selector);
         registry.registerAgent(AGENT_ID, wallet, operator, MANIFEST_HASH);
     }
 
     function test_registerAgent_zeroWalletReverts() public {
-        vm.expectRevert("AgentRegistry: zero wallet");
+        vm.prank(operator);
+        vm.expectRevert(AgentRegistry.ZeroWallet.selector);
         registry.registerAgent(AGENT_ID, address(0), operator, MANIFEST_HASH);
+    }
+
+    function test_registerAgent_strangerReverts() public {
+        vm.prank(stranger);
+        vm.expectRevert(AgentRegistry.UnauthorizedCaller.selector);
+        registry.registerAgent(AGENT_ID, wallet, operator, MANIFEST_HASH);
     }
 
     // ─── isActive ─────────────────────────────────────────────────────────
@@ -88,7 +95,7 @@ contract AgentRegistryTest is Test {
         registry.registerAgent(AGENT_ID, wallet, operator, MANIFEST_HASH);
 
         vm.prank(stranger);
-        vm.expectRevert("AgentRegistry: not operator");
+        vm.expectRevert(AgentRegistry.NotOperator.selector);
         registry.pauseAgent(AGENT_ID);
     }
 
@@ -105,7 +112,7 @@ contract AgentRegistryTest is Test {
         assertTrue(registry.isActive(AGENT_ID));
     }
 
-    function test_revokeAgent_cannotResume() public {
+    function test_revokeAgent_cannotPause() public {
         vm.prank(operator);
         registry.registerAgent(AGENT_ID, wallet, operator, MANIFEST_HASH);
 
@@ -113,7 +120,7 @@ contract AgentRegistryTest is Test {
         registry.revokeAgent(AGENT_ID);
 
         vm.prank(operator);
-        vm.expectRevert("AgentRegistry: agent revoked");
+        vm.expectRevert(AgentRegistry.AgentRevoked.selector);
         registry.pauseAgent(AGENT_ID);
     }
 
@@ -162,7 +169,7 @@ contract AgentRegistryTest is Test {
         registry.registerAgent(AGENT_ID, wallet, operator, MANIFEST_HASH);
 
         vm.prank(stranger);
-        vm.expectRevert("AgentRegistry: unauthorized logger");
+        vm.expectRevert(AgentRegistry.UnauthorizedLogger.selector);
         registry.logExecution(AGENT_ID, keccak256("log"), 100, true);
     }
 
@@ -172,7 +179,6 @@ contract AgentRegistryTest is Test {
 
         uint16 startScore = registry.getAgent(AGENT_ID).reputationScore;
 
-        // Log 5 successes
         vm.startPrank(wallet);
         for (uint i = 0; i < 5; i++) {
             registry.logExecution(AGENT_ID, keccak256(abi.encode("log", i)), 100, true);
@@ -187,14 +193,12 @@ contract AgentRegistryTest is Test {
         vm.prank(operator);
         registry.registerAgent(AGENT_ID, wallet, operator, MANIFEST_HASH);
 
-        // Boost reputation first
         vm.startPrank(wallet);
         for (uint i = 0; i < 5; i++) {
             registry.logExecution(AGENT_ID, keccak256(abi.encode("s", i)), 100, true);
         }
         uint16 highScore = registry.getAgent(AGENT_ID).reputationScore;
 
-        // Then log failures
         for (uint i = 0; i < 5; i++) {
             registry.logExecution(AGENT_ID, keccak256(abi.encode("f", i)), 0, false);
         }
@@ -219,5 +223,23 @@ contract AgentRegistryTest is Test {
         assertEq(agents.length, 2);
         assertEq(agents[0], id1);
         assertEq(agents[1], id2);
+    }
+
+    // ─── addFactory ───────────────────────────────────────────────────────
+
+    function test_addFactory_allowsTrustedRegistration() public {
+        address factory = makeAddr("factory");
+        registry.addFactory(factory);
+
+        vm.prank(factory);
+        registry.registerAgent(AGENT_ID, wallet, operator, MANIFEST_HASH);
+
+        assertTrue(registry.isActive(AGENT_ID));
+    }
+
+    function test_addFactory_notOwnerReverts() public {
+        vm.prank(stranger);
+        vm.expectRevert(AgentRegistry.NotOwner.selector);
+        registry.addFactory(makeAddr("factory"));
     }
 }
