@@ -5,9 +5,6 @@ export default function LandingNav() {
     <nav className="sticky top-0 z-40 border-b border-[#ff7c6f18] bg-[#0b0708]/92 backdrop-blur-xl">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-3 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full border border-[#ff7c6f55] bg-[#ff7c6f14]">
-            <span className="text-sm font-semibold text-[#ff9f95]">A</span>
-          </div>
           <span className="font-semibold tracking-[-0.03em] text-white">
             Actant
           </span>

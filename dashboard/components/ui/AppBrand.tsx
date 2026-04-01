@@ -10,10 +10,6 @@ interface AppBrandProps {
 function BrandContent({ subtitle, showSubtitle = true }: Pick<AppBrandProps, 'subtitle' | 'showSubtitle'>) {
   return (
     <>
-      <div className="flex h-7 w-7 items-center justify-center rounded-full border border-[#ff7c6f55] bg-[#ff7c6f14]">
-        <span className="text-sm font-semibold text-[#ff9f95]">A</span>
-      </div>
-
       <div className={showSubtitle ? 'hidden sm:block' : ''}>
         <p className="text-sm font-semibold leading-none tracking-[-0.04em] text-white">
           Actant

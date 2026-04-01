@@ -4,24 +4,33 @@ import FadeIn from './FadeIn'
 const INSTALL_CODE = 'npm install @actant/sdk'
 
 const DEPLOY_CODE = `import { AgentWallet } from '@actant/sdk'
-import { privateKeyToAccount } from 'viem/accounts'
+import { createWalletClient, custom } from 'viem'
+import { useWallets } from '@privy-io/react-auth'
 
-const account = privateKeyToAccount(process.env.OPERATOR_PRIVATE_KEY)
+const { wallets } = useWallets()
+const wallet = wallets[0]
+const provider = await wallet.getEthereumProvider()
+const walletClient = createWalletClient({
+  account: wallet.address,
+  chain: CHAIN,
+  transport: custom(provider),
+})
 
-const { wallet } = await AgentWallet.create(
+const { wallet: agentWallet } = await AgentWallet.create(
   {
     name: 'research-agent',
     spendingLimit: { daily: '50.00', perTx: '5.00' },
   },
   {
-    account,
+    account: walletClient.account,
+    externalWalletClient: walletClient,
     factory: FACTORY_ADDRESS,
     registry: REGISTRY_ADDRESS,
     chainId: 84532,
   }
 )
 
-console.log(wallet.walletAddress)`
+console.log(agentWallet.walletAddress)`
 
 const PAY_CODE = `const receipt = await wallet.pay({
   to: '0xApiService…',
@@ -45,7 +54,7 @@ export default function LandingQuickStart() {
             <p className="mb-3 font-mono text-[12px] uppercase tracking-[0.14em] text-white/30">
               1. Install
             </p>
-            <CodeBlock>{INSTALL_CODE}</CodeBlock>
+            <CodeBlock language="bash">{INSTALL_CODE}</CodeBlock>
           </div>
         </FadeIn>
 
@@ -54,7 +63,7 @@ export default function LandingQuickStart() {
             <p className="mb-3 font-mono text-[12px] uppercase tracking-[0.14em] text-white/30">
               2. Deploy an agent wallet
             </p>
-            <CodeBlock>{DEPLOY_CODE}</CodeBlock>
+            <CodeBlock language="ts">{DEPLOY_CODE}</CodeBlock>
           </div>
         </FadeIn>
 
@@ -63,7 +72,7 @@ export default function LandingQuickStart() {
             <p className="mb-3 font-mono text-[12px] uppercase tracking-[0.14em] text-white/30">
               3. Make a payment
             </p>
-            <CodeBlock>{PAY_CODE}</CodeBlock>
+            <CodeBlock language="ts">{PAY_CODE}</CodeBlock>
           </div>
         </FadeIn>
       </div>

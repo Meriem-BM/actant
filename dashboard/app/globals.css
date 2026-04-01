@@ -159,6 +159,73 @@ html::after {
   animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.code-block {
+  background: rgba(8, 6, 7, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.875rem;
+  color: #f8eeec;
+  font-family: var(--font-geist-mono), 'IBM Plex Mono', monospace;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  margin: 0;
+  overflow-x: auto;
+  padding: 0.95rem 1rem;
+}
+
+.code-line {
+  display: block;
+  min-height: 1.4em;
+  white-space: pre;
+}
+
+.code-token {
+  white-space: pre;
+}
+
+.code-token--plain {
+  color: #f8eeec;
+}
+
+.code-token--comment {
+  color: #9f8582;
+}
+
+.code-token--string {
+  color: #ffbe8c;
+}
+
+.code-token--number {
+  color: #9db3ff;
+}
+
+.code-token--keyword {
+  color: #ff9f95;
+}
+
+.code-token--literal {
+  color: #ffd089;
+}
+
+.code-token--function {
+  color: #7ad8b8;
+}
+
+.code-token--type {
+  color: #89b4ff;
+}
+
+.code-token--command {
+  color: #7ad8b8;
+}
+
+.code-token--variable {
+  color: #9db3ff;
+}
+
+.code-token--flag {
+  color: #ff9f95;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
