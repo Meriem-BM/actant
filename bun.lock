@@ -14,7 +14,7 @@
       "name": "@actant/dashboard",
       "version": "0.0.1",
       "dependencies": {
-        "@actant/sdk": "workspace:*",
+        "@atactant/sdk": "workspace:*",
         "@privy-io/react-auth": "^3.18.0",
         "framer-motion": "^11.0.0",
         "geist": "^1.3.0",
@@ -34,10 +34,10 @@
       },
     },
     "packages/sdk": {
-      "name": "@actant/sdk",
+      "name": "@atactant/sdk",
       "version": "0.1.0",
       "dependencies": {
-        "@actant/shared": "workspace:*",
+        "@atactant/shared": "^0.2.7",
         "viem": "^2.21.0",
       },
       "devDependencies": {
@@ -45,8 +45,8 @@
       },
     },
     "packages/shared": {
-      "name": "@actant/shared",
-      "version": "0.0.1",
+      "name": "@atactant/shared",
+      "version": "0.2.7",
       "devDependencies": {
         "typescript": "^5.6.3",
       },
@@ -55,13 +55,13 @@
   "packages": {
     "@actant/dashboard": ["@actant/dashboard@workspace:dashboard"],
 
-    "@actant/sdk": ["@actant/sdk@workspace:packages/sdk"],
-
-    "@actant/shared": ["@actant/shared@workspace:packages/shared"],
-
     "@adraffy/ens-normalize": ["@adraffy/ens-normalize@1.11.1", "", {}, "sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ=="],
 
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
+
+    "@atactant/sdk": ["@atactant/sdk@workspace:packages/sdk"],
+
+    "@atactant/shared": ["@atactant/shared@workspace:packages/shared"],
 
     "@babel/runtime": ["@babel/runtime@7.29.2", "", {}, "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g=="],
 

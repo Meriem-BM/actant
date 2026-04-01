@@ -1,4 +1,4 @@
-import type { AgentLogEntry } from '@actant/shared'
+import type { AgentLogEntry } from '@atactant/shared'
 
 export type LoggerInit = {
   agentId: string

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPublicClient, createWalletClient, custom, http, formatEther, type Account } from 'viem'
 import { usePrivy, useWallets } from '@privy-io/react-auth'
-import { AgentWallet, buildManifest } from '@actant/sdk'
+import { AgentWallet, buildManifest } from '@atactant/sdk'
 import {
   CHAIN,
   REGISTRY_ADDRESS,

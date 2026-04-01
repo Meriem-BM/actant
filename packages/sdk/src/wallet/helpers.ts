@@ -14,7 +14,7 @@ import {
   USDC_ADDRESSES,
   type PaymentRequest,
   type WalletConfig,
-} from '@actant/shared'
+} from '@atactant/shared'
 import { AGENT_WALLET_ABI } from '../abis'
 import {
   DEFAULT_CHAIN_ID,

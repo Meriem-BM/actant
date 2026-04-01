@@ -1,5 +1,5 @@
 import { toHex } from 'viem'
-import type { UserOperation } from '@actant/shared'
+import type { UserOperation } from '@atactant/shared'
 import type { JsonRpcResponse } from './types'
 
 export function serializeUserOperation(

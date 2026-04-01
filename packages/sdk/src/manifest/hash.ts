@@ -1,5 +1,5 @@
 import { keccak256, toHex } from 'viem'
-import type { AgentManifest } from '@actant/shared'
+import type { AgentManifest } from '@atactant/shared'
 
 export function hashManifest(manifest: AgentManifest): `0x${string}` {
   const json = JSON.stringify(manifest)

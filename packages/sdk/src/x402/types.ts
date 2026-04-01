@@ -1,4 +1,4 @@
-import type { X402PaymentRequired } from '@actant/shared'
+import type { X402PaymentRequired } from '@atactant/shared'
 
 export type TxHash = `0x${string}`
 

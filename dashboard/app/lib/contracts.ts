@@ -2,7 +2,7 @@
 
 import { formatUnits } from 'viem'
 import { getPublicClient, REGISTRY_ADDRESS, USDC_ADDRESS } from './chain'
-import { AGENT_REGISTRY_ABI, AGENT_WALLET_ABI, ERC20_ABI } from '@actant/sdk'
+import { AGENT_REGISTRY_ABI, AGENT_WALLET_ABI, ERC20_ABI } from '@atactant/sdk'
 
 export interface AgentData {
   agentId:         `0x${string}`  // internal policy registry key (bytes32)

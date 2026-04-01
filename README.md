@@ -13,8 +13,8 @@ Actant is a monorepo for building and running autonomous payment agents on Base 
 ├── dashboard/            # Next.js app (UI + API route demo flow)
 ├── packages/
 │   ├── contracts/        # Solidity contracts + Foundry deployment/testing
-│   ├── sdk/              # @actant/sdk
-│   └── shared/           # @actant/shared shared types/constants
+│   ├── sdk/              # @atactant/sdk
+│   └── shared/           # @atactant/shared shared types/constants
 ├── package.json          # workspace scripts
 └── turbo.json            # Turborepo task graph
 ```
@@ -117,9 +117,9 @@ make deploy-mainnet
 
 ## Key Packages
 
-- `@actant/sdk`: Agent wallet lifecycle, payment execution, x402 retry flow, bundler helpers.
-- `@actant/shared`: cross-package type and chain constant definitions.
-- `@actant/dashboard`: operator-facing UI for creating/running/monitoring agents.
+- `@atactant/sdk`: Agent wallet lifecycle, payment execution, x402 retry flow, bundler helpers.
+- `@atactant/shared`: cross-package type and chain constant definitions.
+- `@atactant/dashboard`: operator-facing UI for creating/running/monitoring agents.
 
 ## Notes
 

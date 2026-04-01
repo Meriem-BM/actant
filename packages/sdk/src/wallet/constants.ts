@@ -1,5 +1,5 @@
 import { keccak256, toHex } from 'viem'
-import { SUPPORTED_CHAINS } from '@actant/shared'
+import { SUPPORTED_CHAINS } from '@atactant/shared'
 
 export const DEFAULT_CHAIN_ID = SUPPORTED_CHAINS.BASE_SEPOLIA
 export const DEFAULT_DAILY_LIMIT = '50.00'

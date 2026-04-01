@@ -1,4 +1,4 @@
-import type { AgentLog, AgentLogEntry } from '@actant/shared'
+import type { AgentLog, AgentLogEntry } from '@atactant/shared'
 import { cloneLog, createSessionId, hashLogEntry } from './helpers'
 import type {
   BaseEntryInput,

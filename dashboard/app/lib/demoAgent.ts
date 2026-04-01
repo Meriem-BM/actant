@@ -7,7 +7,7 @@ import {
   AGENT_WALLET_FACTORY_ABI,
   SUPPORTED_CHAINS,
   type ActantClientConfig,
-} from '@actant/sdk'
+} from '@atactant/sdk'
 import { getTokenPrice, getProtocolTVL, analyzeMarketSignal, type MarketSignal } from '@/app/lib/tools'
 
 const AGENT_NAME        = 'actant-research-agent'

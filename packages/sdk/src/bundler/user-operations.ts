@@ -1,4 +1,4 @@
-import type { UserOperation } from '@actant/shared'
+import type { UserOperation } from '@atactant/shared'
 import { DUMMY_SIGNATURE, ENTRY_POINT } from './constants'
 import { rpc, serializeUserOperation } from './rpc'
 import type { GasEstimate, UserOpReceipt } from './types'

@@ -2,7 +2,7 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@actant/sdk', '@actant/shared'],
+  transpilePackages: ['@atactant/sdk', '@atactant/shared'],
 }
 
 export default nextConfig

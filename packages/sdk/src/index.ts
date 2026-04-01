@@ -30,14 +30,14 @@ export type {
   Transaction,
   Agent,
   UserOperation,
-} from '@actant/shared'
+} from '@atactant/shared'
 
 export {
   USDC_ADDRESSES,
   CONTRACT_ADDRESSES,
   SUPPORTED_CHAINS,
   AgentStatus as AgentStatusEnum,
-} from '@actant/shared'
+} from '@atactant/shared'
 
 export {
   ENTRY_POINT,

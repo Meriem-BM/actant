@@ -4,7 +4,7 @@ import {
   keccak256,
   type Account,
 } from 'viem'
-import type { UserOperation } from '@actant/shared'
+import type { UserOperation } from '@atactant/shared'
 import { AGENT_WALLET_ABI } from '../abis'
 import { ENTRY_POINT } from './constants'
 

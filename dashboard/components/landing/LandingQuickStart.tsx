@@ -1,9 +1,9 @@
 import CodeBlock from './CodeBlock'
 import FadeIn from './FadeIn'
 
-const INSTALL_CODE = 'npm install @actant/sdk'
+const INSTALL_CODE = 'npm install @atactant/sdk'
 
-const DEPLOY_CODE = `import { AgentWallet } from '@actant/sdk'
+const DEPLOY_CODE = `import { AgentWallet } from '@atactant/sdk'
 import { createWalletClient, custom } from 'viem'
 import { useWallets } from '@privy-io/react-auth'
 

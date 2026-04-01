@@ -1,5 +1,5 @@
 import { keccak256, toHex } from 'viem'
-import type { AgentLog, AgentLogEntry } from '@actant/shared'
+import type { AgentLog, AgentLogEntry } from '@atactant/shared'
 
 export function createSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`

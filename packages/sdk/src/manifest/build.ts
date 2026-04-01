@@ -2,7 +2,7 @@ import type {
   AgentCapability,
   AgentManifest,
   AgentSafetyPolicy,
-} from '@actant/shared'
+} from '@atactant/shared'
 import {
   DEFAULT_DAILY_LIMIT,
   DEFAULT_FRAMEWORKS,

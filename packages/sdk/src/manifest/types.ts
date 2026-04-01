@@ -1,4 +1,4 @@
-import type { AgentCapability, WalletConfig } from '@actant/shared'
+import type { AgentCapability, WalletConfig } from '@atactant/shared'
 
 export type BuildManifestParams = {
   agentId: string

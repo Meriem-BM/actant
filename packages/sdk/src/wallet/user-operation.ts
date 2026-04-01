@@ -1,5 +1,5 @@
 import type { Account, createPublicClient } from 'viem'
-import type { UserOperation } from '@actant/shared'
+import type { UserOperation } from '@atactant/shared'
 import {
   ENTRY_POINT,
   ENTRY_POINT_ABI,

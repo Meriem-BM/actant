@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createWalletClient, custom, type Account } from 'viem'
-import { AgentWallet, buildManifest } from '@actant/sdk'
+import { AgentWallet, buildManifest } from '@atactant/sdk'
 import { useWallets } from '@privy-io/react-auth'
 import {
   REGISTRY_ADDRESS,

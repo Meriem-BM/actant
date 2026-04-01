@@ -6,7 +6,7 @@ import type {
   PaymentRequest,
   PaymentResponse,
   WalletConfig,
-} from '@actant/shared'
+} from '@atactant/shared'
 import {
   AGENT_REGISTRY_ABI,
   AGENT_WALLET_ABI,

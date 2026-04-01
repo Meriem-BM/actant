@@ -1,5 +1,5 @@
 import type { Account, Chain, createPublicClient } from 'viem'
-import type { AgentManifest, UserOperation } from '@actant/shared'
+import type { AgentManifest, UserOperation } from '@atactant/shared'
 
 export type Hex = `0x${string}`
 export type Address = `0x${string}`
