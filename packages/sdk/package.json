@@ -10,7 +10,7 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@agentpay/shared": "workspace:*",
+    "@actant/shared": "workspace:*",
     "viem": "^2.21.0"
   },
   "devDependencies": {
