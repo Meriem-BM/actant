@@ -1,5 +1,5 @@
 export { AgentWallet } from './wallet'
-export type { ActantClientConfig } from './wallet'
+export type { ActantClientConfig, WalletClientLike } from './wallet'
 
 export { buildManifest, hashManifest, computeAgentId } from './manifest'
 export { AgentLogger } from './logger'
@@ -30,14 +30,14 @@ export type {
   Transaction,
   Agent,
   UserOperation,
-} from '@agentpay/shared'
+} from '@actant/shared'
 
 export {
   USDC_ADDRESSES,
   CONTRACT_ADDRESSES,
   SUPPORTED_CHAINS,
   AgentStatus as AgentStatusEnum,
-} from '@agentpay/shared'
+} from '@actant/shared'
 
 export {
   ENTRY_POINT,
